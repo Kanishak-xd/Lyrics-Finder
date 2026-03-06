@@ -73,13 +73,32 @@
     <!-- Header -->
     <div class="px-4 pt-[14px] pb-3" style="border-bottom:1px solid rgba(0,0,0,0.06);">
 
-      <!-- Now Playing chip -->
-      <div class="inline-flex items-center gap-1.5 rounded-full px-[10px] py-[3px] mb-[10px] pl-2"
-        style="border:1px solid rgba(255,107,107,0.3);">
-        <span class="w-1.5 h-1.5 rounded-full shrink-0 inline-block" style="background:#FF6B6B;"></span>
-        <span class="text-[9px] font-bold uppercase tracking-[0.18em] pt-px" style="color:#FF6B6B;">Now Playing</span>
-      </div>
+      <div class="flex items-center justify-between mb-[10px]">
 
+        <!-- Now Playing chip -->
+        <div class="inline-flex items-center gap-1.5 rounded-full px-[10px] py-[3px] pl-2"
+          style="border:1px solid rgba(255,107,107,0.3);">
+          <span class="w-1.5 h-1.5 rounded-full shrink-0 inline-block" style="background:#FF6B6B;"></span>
+          <span class="text-[9px] font-bold uppercase tracking-[0.18em] pt-px" style="color:#FF6B6B;">
+            Now Playing
+          </span>
+        </div>
+
+        <!-- Romanized toggle -->
+        <label class="flex items-center gap-1.5 cursor-pointer select-none">
+          <span class="text-[9px] font-semibold uppercase tracking-[0.14em]" style="color:rgba(30,20,10,0.45);">
+            Romanized
+          </span>
+
+          <div class="relative">
+            <input id="romanToggle" type="checkbox" class="sr-only" checked>
+            <div class="w-7 h-4 rounded-full transition" style="background:rgba(0,0,0,0.15);" id="romanTrack"></div>
+
+            <div class="absolute top-[2px] left-[2px] w-3 h-3 rounded-full bg-white shadow transition" id="romanThumb">
+            </div>
+          </div>
+        </label>
+      </div>
       <!-- Song name — marquee container -->
       <div class="marquee-wrap">
         <h2 id="song" class="font-display text-[21px] font-black leading-tight" style="color:#1A1208;">Loading...</h2>

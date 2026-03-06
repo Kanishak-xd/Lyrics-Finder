@@ -87,55 +87,65 @@ fn main() {
             });
 
             // Tray icon
-            TrayIconBuilder::new()
-                .on_tray_icon_event(move |tray, event| {
-                    if let TrayIconEvent::Click {
-                        button: MouseButton::Left,
-                        position,
-                        ..
-                    } = event {
-                        let window = tray.app_handle()
-                            .get_webview_window("main")
-                            .unwrap();
+TrayIconBuilder::new()
+    .icon(app.default_window_icon().unwrap().clone())
+    .on_tray_icon_event(move |tray, event| {
+        if let TrayIconEvent::Click {
+            button: MouseButton::Left,
+            position,
+            ..
+        } = event {
+            let window = tray.app_handle()
+                .get_webview_window("main")
+                .unwrap();
 
-                        if window.is_visible().unwrap_or(false) {
-                            let elapsed = shown_at_tray.lock().unwrap()
-                                .map(|t| t.elapsed())
-                                .unwrap_or(Duration::from_secs(999));
-                            if elapsed > Duration::from_millis(300) {
-                                *shown_at_tray.lock().unwrap() = None;
-                                let _ = window.hide();
-                            }
-                            return;
-                        }
+            if window.is_visible().unwrap_or(false) {
+                let elapsed = shown_at_tray.lock().unwrap()
+                    .map(|t| t.elapsed())
+                    .unwrap_or(Duration::from_secs(999));
+                if elapsed > Duration::from_millis(300) {
+                    *shown_at_tray.lock().unwrap() = None;
+                    let _ = window.hide();
+                }
+                return;
+            }
 
-                        let screen_width = window.current_monitor()
-                            .ok().flatten()
-                            .map(|m| m.size().width as i32)
-                            .unwrap_or(1920);
-                        let widget_w = 290_i32;
-                        let x = (position.x as i32 - widget_w / 2)
-                            .max(0)
-                            .min(screen_width - widget_w);
-                        let y = position.y as i32 - 260 - 8;
-                        let tray_x_in_widget = position.x as i32 - x;
+            let screen_width = window.current_monitor()
+                .ok().flatten()
+                .map(|m| m.size().width as i32)
+                .unwrap_or(1920);
 
-                        let _ = window.set_position(
-                            tauri::Position::Physical(
-                                tauri::PhysicalPosition { x, y }
-                            )
-                        );
+            let widget_w = 290_i32;
 
-                        *shown_at_tray.lock().unwrap() = Some(Instant::now());
-                        let _ = window.show();
-                        let _ = window.set_focus();
-                        let js = format!("window.setCaret({}); window.fetchTrack();", tray_x_in_widget);
-                        let _ = window.eval(&js);
-                    }
-                })
-                .build(app)?;
+            let x = (position.x as i32 - widget_w / 2)
+                .max(0)
+                .min(screen_width - widget_w);
 
-            Ok(())
+            let y = position.y as i32 - 260 - 8;
+            let tray_x_in_widget = position.x as i32 - x;
+
+            let _ = window.set_position(
+                tauri::Position::Physical(
+                    tauri::PhysicalPosition { x, y }
+                )
+            );
+
+            *shown_at_tray.lock().unwrap() = Some(Instant::now());
+
+            let _ = window.show();
+            let _ = window.set_focus();
+
+            let js = format!(
+                "window.setCaret({}); window.fetchTrack();",
+                tray_x_in_widget
+            );
+
+            let _ = window.eval(&js);
+        }
+    })
+    .build(app)?;
+
+    Ok(())
         })
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

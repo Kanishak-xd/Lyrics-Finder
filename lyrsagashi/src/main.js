@@ -3,16 +3,17 @@ import { openUrl } from "@tauri-apps/plugin-opener";
 import { listen } from "@tauri-apps/api/event";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 
-const clientId    = "a5507c40cbf843219626ad3b1e205254";
-const redirectUri = "http://127.0.0.1:8888/callback";
+const clientId = import.meta.env.VITE_SPOTIFY_CLIENT_ID;
+const redirectUri = import.meta.env.VITE_SPOTIFY_REDIRECT_URI;
 
 const win = getCurrentWindow();
 
-let currentSong   = "";
-let currentArtist = "";
+let romanizedEnabled = true;
+let currentSong      = "";
+let currentArtist    = "";
 let buttons;
 
-// Auth helpers
+// ── Auth helpers ──────────────────────────────────────────────────────────────
 
 function generateRandomString(length) {
   const chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789";
@@ -27,7 +28,9 @@ async function sha256(plain) {
 
 function base64urlencode(a) {
   return btoa(String.fromCharCode(...new Uint8Array(a)))
-    .replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
+    .replace(/\+/g, "-")
+    .replace(/\//g, "_")
+    .replace(/=+$/, "");
 }
 
 async function loginSpotify() {
@@ -35,9 +38,12 @@ async function loginSpotify() {
   localStorage.setItem("spotify_code_verifier", verifier);
   const challenge = base64urlencode(await sha256(verifier));
   const params = new URLSearchParams({
-    response_type: "code", client_id: clientId,
+    response_type: "code",
+    client_id: clientId,
     scope: "user-read-currently-playing user-read-playback-state",
-    redirect_uri: redirectUri, code_challenge_method: "S256", code_challenge: challenge,
+    redirect_uri: redirectUri,
+    code_challenge_method: "S256",
+    code_challenge: challenge,
   });
   await openUrl(`https://accounts.spotify.com/authorize?${params}`);
 }
@@ -47,7 +53,9 @@ async function exchangeToken(code) {
     method: "POST",
     headers: { "Content-Type": "application/x-www-form-urlencoded" },
     body: new URLSearchParams({
-      client_id: clientId, grant_type: "authorization_code", code,
+      client_id: clientId,
+      grant_type: "authorization_code",
+      code,
       redirect_uri: redirectUri,
       code_verifier: localStorage.getItem("spotify_code_verifier"),
     }),
@@ -69,7 +77,9 @@ async function refreshToken() {
     method: "POST",
     headers: { "Content-Type": "application/x-www-form-urlencoded" },
     body: new URLSearchParams({
-      client_id: clientId, grant_type: "refresh_token", refresh_token: refresh,
+      client_id: clientId,
+      grant_type: "refresh_token",
+      refresh_token: refresh,
     }),
   });
   const data = await res.json();
@@ -81,7 +91,7 @@ async function refreshToken() {
   return false;
 }
 
-// Synced marquee
+// ── Synced marquee ────────────────────────────────────────────────────────────
 
 let marqueeFrame = null;
 
@@ -94,12 +104,13 @@ function startMarquee(songEl, artistEl) {
   songEl.style.transform   = "translateX(0)";
   artistEl.style.transform = "translateX(0)";
 
-  const ovA = Math.max(0, songEl.scrollWidth   - songEl.parentElement.clientWidth);
-  const ovB = Math.max(0, artistEl.scrollWidth - artistEl.parentElement.clientWidth);
+  const ovA   = Math.max(0, songEl.scrollWidth   - songEl.parentElement.clientWidth);
+  const ovB   = Math.max(0, artistEl.scrollWidth - artistEl.parentElement.clientWidth);
   const maxOv = Math.max(ovA, ovB);
   if (maxOv <= 2) return;
+
   const pxPerSec = 40;
-  const travelMs = (maxOv / pxPerSec) * 1000; 
+  const travelMs = (maxOv / pxPerSec) * 1000;
   const pauseMs  = 1400;
 
   let phase     = "pause-start";
@@ -126,8 +137,8 @@ function startMarquee(songEl, artistEl) {
 
     } else if (phase === "scroll-right") {
       t = Math.min(elapsed / travelMs, 1);
-      songEl.style.transform   = `translateX(${-Math.max(0, ovA   - maxOv * t)}px)`;
-      artistEl.style.transform = `translateX(${-Math.max(0, ovB   - maxOv * t)}px)`;
+      songEl.style.transform   = `translateX(${-Math.max(0, ovA - maxOv * t)}px)`;
+      artistEl.style.transform = `translateX(${-Math.max(0, ovB - maxOv * t)}px)`;
       if (t >= 1) { phase = "pause-start"; startTime = now; }
     }
 
@@ -145,7 +156,8 @@ function updateDisplay(song, artist) {
   requestAnimationFrame(() => requestAnimationFrame(() => startMarquee(songEl, artistEl)));
 }
 
-// Spotify fetch
+// ── Spotify fetch ─────────────────────────────────────────────────────────────
+
 async function fetchTrack() {
   try {
     const token = localStorage.getItem("spotify_token");
@@ -179,8 +191,30 @@ async function fetchTrack() {
   }
 }
 
-// Init
+// ── Init ──────────────────────────────────────────────────────────────────────
+
 window.addEventListener("DOMContentLoaded", async () => {
+  const toggle = document.getElementById("romanToggle");
+  const track  = document.getElementById("romanTrack");
+  const thumb  = document.getElementById("romanThumb");
+
+  function updateToggleUI() {
+    if (romanizedEnabled) {
+      track.style.background  = "#FF6B6B";
+      thumb.style.transform   = "translateX(12px)";
+    } else {
+      track.style.background  = "rgba(0,0,0,0.15)";
+      thumb.style.transform   = "translateX(0)";
+    }
+  }
+
+    toggle.addEventListener("change", (e) => {
+        romanizedEnabled = e.target.checked;
+        updateToggleUI();
+    });
+
+  updateToggleUI();
+
   buttons = document.querySelectorAll("button");
   buttons.forEach(b => (b.disabled = true));
 
@@ -189,18 +223,24 @@ window.addEventListener("DOMContentLoaded", async () => {
   window.fetchTrack = fetchTrack;
 });
 
-// on btn click open in system browser + close widget
+// ── Open lyrics ───────────────────────────────────────────────────────────────
+
 window.openLyrics = async function(site) {
   if (!currentSong) return;
 
-  const q    = encodeURIComponent(`${currentSong} ${currentArtist}`);
-  const qRom = encodeURIComponent(`${currentSong} ${currentArtist} romanized`);
+  const baseQuery = `${currentSong} ${currentArtist}`;
+
+  const finalQuery = romanizedEnabled
+    ? `${baseQuery} romanized`
+    : baseQuery;
+
+  const encoded = encodeURIComponent(finalQuery);
 
   const urls = {
-    genius:     `https://genius.com/search?q=${qRom}`,
-    colorcoded: `https://colorcodedlyrics.com/?s=${qRom}`,
-    az:         `https://www.google.com/search?q=site:azlyrics.com+${q}`,
-    musixmatch: `https://www.musixmatch.com/search?query=${qRom}`,
+    genius: `https://genius.com/search?q=${encoded}`,
+    colorcoded: `https://colorcodedlyrics.com/?s=${encoded}`,
+    az: `https://www.google.com/search?q=site:azlyrics.com+${encoded}`,
+    musixmatch: `https://www.musixmatch.com/search?query=${encoded}`,
   };
 
   await openUrl(urls[site]);
