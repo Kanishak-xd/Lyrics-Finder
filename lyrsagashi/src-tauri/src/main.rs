@@ -1,21 +1,75 @@
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
-use tauri::{Manager, WindowEvent};
+use tauri::{Manager, WindowEvent, Emitter};
 use tauri::tray::{TrayIconBuilder, TrayIconEvent, MouseButton};
 use std::sync::{Arc, Mutex};
 use std::time::{Instant, Duration};
+use std::thread;
 
 fn main() {
     tauri::Builder::default()
         .plugin(tauri_plugin_shell::init())
+        .plugin(tauri_plugin_opener::init())
         .setup(|app| {
             let window = app.get_webview_window("main").unwrap();
             let _ = window.set_shadow(false);
 
-            // Stores the instant when show() was last called.
-            // Blur events within 300ms of showing are ignored — they are
-            // always OS focus-handoff artifacts from the tray click, not
-            // genuine "user clicked elsewhere" events.
+            // ── Spotify OAuth callback server ─────────────────────────────
+            // Listens on 127.0.0.1:8888, waits for GET /callback?code=...
+            // then emits "spotify-code" to the webview so JS can exchange it.
+            let app_handle = app.handle().clone();
+            thread::spawn(move || {
+                let server = match tiny_http::Server::http("127.0.0.1:8888") {
+                    Ok(s) => s,
+                    Err(e) => {
+                        eprintln!("Failed to start OAuth server: {e}");
+                        return;
+                    }
+                };
+
+                for request in server.incoming_requests() {
+                    let url = request.url().to_string();
+
+                    if url.starts_with("/callback") {
+                        let code = url
+                            .split('?')
+                            .nth(1)
+                            .and_then(|qs| {
+                                qs.split('&')
+                                    .find(|p| p.starts_with("code="))
+                                    .map(|p| p["code=".len()..].to_string())
+                            });
+
+                        if let Some(code) = code {
+                            let html = "<html><body style='font-family:sans-serif;text-align:center;padding-top:80px'>\
+                                <h2>&#x2705; Logged in!</h2><p>You can close this tab.</p></body></html>";
+                            let response = tiny_http::Response::from_string(html)
+                                .with_header(
+                                    "Content-Type: text/html"
+                                        .parse::<tiny_http::Header>()
+                                        .unwrap(),
+                                );
+                            let _ = request.respond(response);
+
+                            if let Some(win) = app_handle.get_webview_window("main") {
+                                let _ = win.emit("spotify-code", code);
+                            }
+                        } else {
+                            let _ = request.respond(
+                                tiny_http::Response::from_string("Missing code parameter")
+                                    .with_status_code(400),
+                            );
+                        }
+                    } else {
+                        let _ = request.respond(
+                            tiny_http::Response::from_string("Not found")
+                                .with_status_code(404),
+                        );
+                    }
+                }
+            });
+
+            // ── Focus / hide logic ────────────────────────────────────────
             let shown_at: Arc<Mutex<Option<Instant>>> = Arc::new(Mutex::new(None));
             let shown_at_event = shown_at.clone();
             let shown_at_tray  = shown_at.clone();
@@ -27,8 +81,6 @@ fn main() {
                     let elapsed = guard
                         .map(|t| t.elapsed())
                         .unwrap_or(Duration::from_secs(999));
-
-                    // Only hide if we've been shown for more than 300ms
                     if elapsed > Duration::from_millis(300) {
                         drop(guard);
                         let _ = win_clone.hide();
@@ -36,6 +88,7 @@ fn main() {
                 }
             });
 
+            // ── Tray icon ─────────────────────────────────────────────────
             TrayIconBuilder::new()
                 .on_tray_icon_event(move |tray, event| {
                     if let TrayIconEvent::Click {
@@ -47,12 +100,10 @@ fn main() {
                             .get_webview_window("main")
                             .unwrap();
 
-                        // Toggle: if visible AND shown more than 300ms ago, hide it
                         if window.is_visible().unwrap_or(false) {
                             let elapsed = shown_at_tray.lock().unwrap()
                                 .map(|t| t.elapsed())
                                 .unwrap_or(Duration::from_secs(999));
-
                             if elapsed > Duration::from_millis(300) {
                                 *shown_at_tray.lock().unwrap() = None;
                                 let _ = window.hide();
@@ -60,7 +111,6 @@ fn main() {
                             return;
                         }
 
-                        // Center widget over tray icon, clamped to screen edges
                         let screen_width = window.current_monitor()
                             .ok().flatten()
                             .map(|m| m.size().width as i32)
@@ -70,9 +120,6 @@ fn main() {
                             .max(0)
                             .min(screen_width - widget_w);
                         let y = position.y as i32 - 260 - 8;
-
-                        // Tell JS where the tray icon is relative to the widget
-                        // so the caret can point exactly at it
                         let tray_x_in_widget = position.x as i32 - x;
 
                         let _ = window.set_position(
@@ -81,13 +128,10 @@ fn main() {
                             )
                         );
 
-                        // Record show time BEFORE show() so the blur handler
-                        // sees a valid timestamp immediately
                         *shown_at_tray.lock().unwrap() = Some(Instant::now());
                         let _ = window.show();
                         let _ = window.set_focus();
-                        // Move caret to point at tray icon
-                        let js = format!("window.setCaret({})", tray_x_in_widget);
+                        let js = format!("window.setCaret({}); window.fetchTrack();", tray_x_in_widget);
                         let _ = window.eval(&js);
                     }
                 })

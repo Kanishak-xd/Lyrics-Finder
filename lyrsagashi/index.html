@@ -26,9 +26,7 @@
           animation: {
             slideUp: 'slideUp 0.2s cubic-bezier(0.22,1,0.36,1) both',
           },
-          colors: {
-            cream: '#FDFAF5',
-          },
+          colors: { cream: '#FDFAF5' },
         }
       }
     }
@@ -50,6 +48,19 @@
       background: transparent !important;
       font-family: 'DM Sans', sans-serif;
     }
+
+    /* Marquee container — clips the scrolling text */
+    .marquee-wrap {
+      overflow: hidden;
+      white-space: nowrap;
+    }
+
+    /* Text starts as inline-block so scrollWidth is measurable */
+    .marquee-wrap>* {
+      display: inline-block;
+      white-space: nowrap;
+      max-width: none;
+    }
   </style>
 </head>
 
@@ -66,20 +77,23 @@
       <div class="inline-flex items-center gap-1.5 rounded-full px-[10px] py-[3px] mb-[10px] pl-2"
         style="border:1px solid rgba(255,107,107,0.3);">
         <span class="w-1.5 h-1.5 rounded-full shrink-0 inline-block" style="background:#FF6B6B;"></span>
-        <span class="text-[9px] font-bold uppercase tracking-[0.18em] pt-px" style="color:#FF6B6B;">Now
-          Playing</span>
+        <span class="text-[9px] font-bold uppercase tracking-[0.18em] pt-px" style="color:#FF6B6B;">Now Playing</span>
       </div>
 
-      <h2 id="song" class="font-display text-[21px] font-black leading-tight truncate" style="color:#1A1208;">Loading...
-      </h2>
-      <p id="artist" class="text-[11.5px] font-medium mt-[3px] truncate" style="color:rgba(30,20,10,0.38);">Waiting for
-        Spotify...</p>
+      <!-- Song name — marquee container -->
+      <div class="marquee-wrap">
+        <h2 id="song" class="font-display text-[21px] font-black leading-tight" style="color:#1A1208;">Loading...</h2>
+      </div>
+
+      <!-- Artist name — marquee container -->
+      <div class="marquee-wrap mt-[3px]">
+        <p id="artist" class="text-[11.5px] font-medium" style="color:rgba(30,20,10,0.38);">Waiting for Spotify...</p>
+      </div>
     </div>
 
     <!-- Buttons grid -->
     <div class="grid grid-cols-2 gap-1.5 p-[10px]">
 
-      <!-- Genius -->
       <button onclick="openLyrics('genius')"
         class="flex items-center justify-between rounded-xl px-[10px] py-[9px] min-w-0 transition-all duration-150 active:opacity-75"
         style="background:#FFF8E7; border:1.5px solid rgba(245,185,0,0.28);"
@@ -92,7 +106,6 @@
         </svg>
       </button>
 
-      <!-- ColorCoded -->
       <button onclick="openLyrics('colorcoded')"
         class="flex items-center justify-between rounded-xl px-[10px] py-[9px] min-w-0 transition-all duration-150 active:opacity-75"
         style="background:#FFF0F3; border:1.5px solid rgba(255,100,130,0.22);"
@@ -105,7 +118,6 @@
         </svg>
       </button>
 
-      <!-- AZLyrics -->
       <button onclick="openLyrics('az')"
         class="flex items-center justify-between rounded-xl px-[10px] py-[9px] min-w-0 transition-all duration-150 active:opacity-75"
         style="background:#EFF6FF; border:1.5px solid rgba(80,160,255,0.22);"
@@ -118,7 +130,6 @@
         </svg>
       </button>
 
-      <!-- Musixmatch -->
       <button onclick="openLyrics('musixmatch')"
         class="flex items-center justify-between rounded-xl px-[10px] py-[9px] min-w-0 transition-all duration-150 active:opacity-75"
         style="background:#F0FBF4; border:1.5px solid rgba(80,200,120,0.22);"
@@ -134,7 +145,7 @@
     </div>
   </div>
 
-  <!-- Caret: x set by Rust via window.setCaret() -->
+  <!-- Caret -->
   <div class="relative h-[9px] -mt-px">
     <svg id="caret-svg" width="16" height="9" viewBox="0 0 16 9" fill="none" class="absolute -translate-x-1/2"
       style="left:145px;">
