@@ -26,6 +26,9 @@
           animation: {
             slideUp: 'slideUp 0.2s cubic-bezier(0.22,1,0.36,1) both',
           },
+          colors: {
+            cream: '#FDFAF5',
+          },
         }
       }
     }
@@ -39,132 +42,90 @@
       padding: 0;
     }
 
-    /* Every level must be transparent — Tailwind preflight, webview defaults, all of it */
     html {
       background: transparent !important;
     }
 
     body {
-      font-family: 'DM Sans', sans-serif;
       background: transparent !important;
-      /* Fixed width matching tauri window, NO height constraint — let content be natural */
-      width: 290px;
-      /* Padding: top gap + side margins. Bottom=0, caret handles its own space */
-      padding: 8px 11px 0 11px;
-      overflow: visible;
+      font-family: 'DM Sans', sans-serif;
     }
   </style>
 </head>
 
-<body class="animate-slideUp">
+<body class="animate-slideUp w-[290px] overflow-visible px-[11px] pt-2">
 
-  <!-- Card: explicit width so it never overflows -->
-  <div id="card" style="
-    width: 268px;
-    background: #FDFAF5;
-    border: 1.5px solid rgba(0,0,0,0.09);
-    border-radius: 16px;
-    box-shadow: 0 8px 32px rgba(0,0,0,0.12), 0 2px 8px rgba(0,0,0,0.06);
-  ">
+  <!-- Card -->
+  <div class="w-[268px] rounded-2xl"
+    style="background:#FDFAF5; border:1.5px solid rgba(0,0,0,0.09); box-shadow:0 8px 32px rgba(0,0,0,0.12),0 2px 8px rgba(0,0,0,0.06);">
 
     <!-- Header -->
-    <div style="padding: 14px 16px 12px 16px; border-bottom: 1px solid rgba(0,0,0,0.06);">
+    <div class="px-4 pt-[14px] pb-3" style="border-bottom:1px solid rgba(0,0,0,0.06);">
 
       <!-- Now Playing chip -->
-      <div style="
-        display: inline-flex; align-items: center; gap: 6px;
-        border: 1px solid rgba(255,107,107,0.3);
-        border-radius: 999px;
-        padding: 3px 10px 3px 8px;
-        margin-bottom: 10px;
-      ">
-        <span
-          style="width:6px;height:6px;border-radius:50%;background:#FF6B6B;flex-shrink:0;display:inline-block;"></span>
-        <span style="font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:0.18em;color:#FF6B6B;">Now
+      <div class="inline-flex items-center gap-1.5 rounded-full px-[10px] py-[3px] mb-[10px] pl-2"
+        style="border:1px solid rgba(255,107,107,0.3);">
+        <span class="w-1.5 h-1.5 rounded-full shrink-0 inline-block" style="background:#FF6B6B;"></span>
+        <span class="text-[9px] font-bold uppercase tracking-[0.18em] pt-px" style="color:#FF6B6B;">Now
           Playing</span>
       </div>
 
-      <h2 class="font-display"
-        style="font-size:21px;font-weight:900;color:#1A1208;line-height:1.2;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">
-        Golden Hour</h2>
-      <p
-        style="font-size:11.5px;font-weight:500;color:rgba(30,20,10,0.38);margin-top:3px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">
-        JVKE &nbsp;·&nbsp; 2022</p>
+      <h2 id="song" class="font-display text-[21px] font-black leading-tight truncate" style="color:#1A1208;">Loading...
+      </h2>
+      <p id="artist" class="text-[11.5px] font-medium mt-[3px] truncate" style="color:rgba(30,20,10,0.38);">Waiting for
+        Spotify...</p>
     </div>
 
-    <!-- Buttons 2x2 grid -->
-    <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;padding:10px;">
+    <!-- Buttons grid -->
+    <div class="grid grid-cols-2 gap-1.5 p-[10px]">
 
-      <button onclick="open('https://genius.com/search?q=Golden+Hour+JVKE')"
-        style="display:flex;align-items:center;gap:8px;border-radius:12px;padding:9px 10px;background:#FFF8E7;border:1.5px solid rgba(245,185,0,0.28);cursor:pointer;transition:background 0.15s,border-color 0.15s;min-width:0;"
+      <!-- Genius -->
+      <button onclick="openLyrics('genius')"
+        class="flex items-center justify-between rounded-xl px-[10px] py-[9px] min-w-0 transition-all duration-150 active:opacity-75"
+        style="background:#FFF8E7; border:1.5px solid rgba(245,185,0,0.28);"
         onmouseover="this.style.background='#FFF0C0';this.style.borderColor='rgba(245,185,0,0.65)'"
-        onmouseout="this.style.background='#FFF8E7';this.style.borderColor='rgba(245,185,0,0.28)'"
-        onmousedown="this.style.opacity='0.75'" onmouseup="this.style.opacity='1'">
-        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" style="flex-shrink:0">
-          <circle cx="12" cy="12" r="12" fill="#FFD234" />
-          <text x="12" y="17" text-anchor="middle" font-family="Georgia,serif" font-weight="900" font-size="13"
-            fill="#1A1A1A">G</text>
-        </svg>
-        <span
-          style="font-size:12px;font-weight:600;color:#1A1208;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">Genius</span>
-        <svg style="margin-left:auto;opacity:0.22;flex-shrink:0" width="10" height="10" viewBox="0 0 12 12" fill="none">
+        onmouseout="this.style.background='#FFF8E7';this.style.borderColor='rgba(245,185,0,0.28)'">
+        <span class="text-[12px] font-semibold truncate" style="color:#1A1208;">Genius</span>
+        <svg class="opacity-20 shrink-0 ml-1" width="10" height="10" viewBox="0 0 12 12" fill="none">
           <path d="M2 10L10 2M10 2H5M10 2V7" stroke="#1A1208" stroke-width="1.6" stroke-linecap="round"
             stroke-linejoin="round" />
         </svg>
       </button>
 
-      <button onclick="open('https://colorcodedlyrics.com/?s=Golden+Hour+JVKE')"
-        style="display:flex;align-items:center;gap:8px;border-radius:12px;padding:9px 10px;background:#FFF0F3;border:1.5px solid rgba(255,100,130,0.22);cursor:pointer;transition:background 0.15s,border-color 0.15s;min-width:0;"
+      <!-- ColorCoded -->
+      <button onclick="openLyrics('colorcoded')"
+        class="flex items-center justify-between rounded-xl px-[10px] py-[9px] min-w-0 transition-all duration-150 active:opacity-75"
+        style="background:#FFF0F3; border:1.5px solid rgba(255,100,130,0.22);"
         onmouseover="this.style.background='#FFE0E8';this.style.borderColor='rgba(255,100,130,0.55)'"
-        onmouseout="this.style.background='#FFF0F3';this.style.borderColor='rgba(255,100,130,0.22)'"
-        onmousedown="this.style.opacity='0.75'" onmouseup="this.style.opacity='1'">
-        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" style="flex-shrink:0">
-          <circle cx="12" cy="12" r="12" fill="#FF6B8A" />
-          <circle cx="9" cy="10" r="2.2" fill="white" opacity="0.95" />
-          <circle cx="15" cy="10" r="2.2" fill="white" opacity="0.95" />
-          <circle cx="12" cy="15.5" r="2.2" fill="white" opacity="0.95" />
-        </svg>
-        <span
-          style="font-size:12px;font-weight:600;color:#1A1208;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">ColorCoded</span>
-        <svg style="margin-left:auto;opacity:0.22;flex-shrink:0" width="10" height="10" viewBox="0 0 12 12" fill="none">
+        onmouseout="this.style.background='#FFF0F3';this.style.borderColor='rgba(255,100,130,0.22)'">
+        <span class="text-[12px] font-semibold truncate" style="color:#1A1208;">ColorCoded</span>
+        <svg class="opacity-20 shrink-0 ml-1" width="10" height="10" viewBox="0 0 12 12" fill="none">
           <path d="M2 10L10 2M10 2H5M10 2V7" stroke="#1A1208" stroke-width="1.6" stroke-linecap="round"
             stroke-linejoin="round" />
         </svg>
       </button>
 
-      <button onclick="open('https://search.azlyrics.com/search.php?q=Golden+Hour+JVKE')"
-        style="display:flex;align-items:center;gap:8px;border-radius:12px;padding:9px 10px;background:#EFF6FF;border:1.5px solid rgba(80,160,255,0.22);cursor:pointer;transition:background 0.15s,border-color 0.15s;min-width:0;"
+      <!-- AZLyrics -->
+      <button onclick="openLyrics('az')"
+        class="flex items-center justify-between rounded-xl px-[10px] py-[9px] min-w-0 transition-all duration-150 active:opacity-75"
+        style="background:#EFF6FF; border:1.5px solid rgba(80,160,255,0.22);"
         onmouseover="this.style.background='#DDEEFF';this.style.borderColor='rgba(80,160,255,0.55)'"
-        onmouseout="this.style.background='#EFF6FF';this.style.borderColor='rgba(80,160,255,0.22)'"
-        onmousedown="this.style.opacity='0.75'" onmouseup="this.style.opacity='1'">
-        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" style="flex-shrink:0">
-          <rect width="24" height="24" rx="6" fill="#4FA8FF" />
-          <text x="12" y="16.5" text-anchor="middle" font-family="Georgia,serif" font-weight="900" font-size="10"
-            fill="white" letter-spacing="-0.5">AZ</text>
-        </svg>
-        <span
-          style="font-size:12px;font-weight:600;color:#1A1208;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">AZLyrics</span>
-        <svg style="margin-left:auto;opacity:0.22;flex-shrink:0" width="10" height="10" viewBox="0 0 12 12" fill="none">
+        onmouseout="this.style.background='#EFF6FF';this.style.borderColor='rgba(80,160,255,0.22)'">
+        <span class="text-[12px] font-semibold truncate" style="color:#1A1208;">AZLyrics</span>
+        <svg class="opacity-20 shrink-0 ml-1" width="10" height="10" viewBox="0 0 12 12" fill="none">
           <path d="M2 10L10 2M10 2H5M10 2V7" stroke="#1A1208" stroke-width="1.6" stroke-linecap="round"
             stroke-linejoin="round" />
         </svg>
       </button>
 
-      <button onclick="open('https://www.musixmatch.com/search/Golden+Hour+JVKE')"
-        style="display:flex;align-items:center;gap:8px;border-radius:12px;padding:9px 10px;background:#F0FBF4;border:1.5px solid rgba(80,200,120,0.22);cursor:pointer;transition:background 0.15s,border-color 0.15s;min-width:0;"
+      <!-- Musixmatch -->
+      <button onclick="openLyrics('musixmatch')"
+        class="flex items-center justify-between rounded-xl px-[10px] py-[9px] min-w-0 transition-all duration-150 active:opacity-75"
+        style="background:#F0FBF4; border:1.5px solid rgba(80,200,120,0.22);"
         onmouseover="this.style.background='#DCFAE6';this.style.borderColor='rgba(80,200,120,0.55)'"
-        onmouseout="this.style.background='#F0FBF4';this.style.borderColor='rgba(80,200,120,0.22)'"
-        onmousedown="this.style.opacity='0.75'" onmouseup="this.style.opacity='1'">
-        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" style="flex-shrink:0">
-          <rect width="24" height="24" rx="6" fill="#4CC870" />
-          <path d="M8 17V10l8-2.5V14" stroke="white" stroke-width="1.8" stroke-linecap="round"
-            stroke-linejoin="round" />
-          <circle cx="8" cy="17" r="2.2" fill="white" />
-          <circle cx="16" cy="14" r="2.2" fill="white" />
-        </svg>
-        <span
-          style="font-size:12px;font-weight:600;color:#1A1208;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">Musixmatch</span>
-        <svg style="margin-left:auto;opacity:0.22;flex-shrink:0" width="10" height="10" viewBox="0 0 12 12" fill="none">
+        onmouseout="this.style.background='#F0FBF4';this.style.borderColor='rgba(80,200,120,0.22)'">
+        <span class="text-[12px] font-semibold truncate" style="color:#1A1208;">Musixmatch</span>
+        <svg class="opacity-20 shrink-0 ml-1" width="10" height="10" viewBox="0 0 12 12" fill="none">
           <path d="M2 10L10 2M10 2H5M10 2V7" stroke="#1A1208" stroke-width="1.6" stroke-linecap="round"
             stroke-linejoin="round" />
         </svg>
@@ -173,10 +134,10 @@
     </div>
   </div>
 
-  <!-- Caret: x position set dynamically by Rust via window.setCaret() -->
-  <div id="caret-row" style="position:relative;height:9px;margin-top:-1px;">
-    <svg id="caret-svg" width="16" height="9" viewBox="0 0 16 9" fill="none"
-      style="position:absolute;left:145px;transform:translateX(-50%);">
+  <!-- Caret: x set by Rust via window.setCaret() -->
+  <div class="relative h-[9px] -mt-px">
+    <svg id="caret-svg" width="16" height="9" viewBox="0 0 16 9" fill="none" class="absolute -translate-x-1/2"
+      style="left:145px;">
       <path d="M1 0 L8 8 L15 0 Z" fill="#FDFAF5" stroke="rgba(0,0,0,0.09)" stroke-width="1.5" stroke-linejoin="round" />
       <line x1="0" y1="0.75" x2="16" y2="0.75" stroke="#FDFAF5" stroke-width="1.5" />
     </svg>
