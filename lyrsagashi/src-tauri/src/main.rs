@@ -14,9 +14,7 @@ fn main() {
             let window = app.get_webview_window("main").unwrap();
             let _ = window.set_shadow(false);
 
-            // ── Spotify OAuth callback server ─────────────────────────────
-            // Listens on 127.0.0.1:8888, waits for GET /callback?code=...
-            // then emits "spotify-code" to the webview so JS can exchange it.
+            // Spotify OAuth callback server
             let app_handle = app.handle().clone();
             thread::spawn(move || {
                 let server = match tiny_http::Server::http("127.0.0.1:8888") {
@@ -69,7 +67,7 @@ fn main() {
                 }
             });
 
-            // ── Focus / hide logic ────────────────────────────────────────
+            // Focus / hide logic
             let shown_at: Arc<Mutex<Option<Instant>>> = Arc::new(Mutex::new(None));
             let shown_at_event = shown_at.clone();
             let shown_at_tray  = shown_at.clone();
@@ -88,7 +86,7 @@ fn main() {
                 }
             });
 
-            // ── Tray icon ─────────────────────────────────────────────────
+            // Tray icon
             TrayIconBuilder::new()
                 .on_tray_icon_event(move |tray, event| {
                     if let TrayIconEvent::Click {
