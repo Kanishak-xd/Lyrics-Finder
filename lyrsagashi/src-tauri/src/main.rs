@@ -15,7 +15,7 @@ fn main() {
             let window = app.get_webview_window("main").unwrap();
             let _ = window.set_shadow(false);
 
-            // Spotify OAuth callback server 
+            // Spotify OAuth callback server
             let app_handle = app.handle().clone();
             thread::spawn(move || {
                 let server = match tiny_http::Server::http("127.0.0.1:8888") {
@@ -54,7 +54,7 @@ fn main() {
                 }
             });
 
-            // Focus / hide logic 
+            // Focus / hide logic
             let shown_at: Arc<Mutex<Option<Instant>>> = Arc::new(Mutex::new(None));
             let shown_at_event = shown_at.clone();
             let shown_at_tray  = shown_at.clone();
@@ -71,12 +71,13 @@ fn main() {
                 }
             });
 
-            // Right-click context menu
+            // Right-click context menu 
             let close_item = MenuItem::with_id(app, "quit", "Close Application", true, None::<&str>)?;
             let menu = Menu::with_items(app, &[&close_item])?;
 
-            // Tray icon 
+            // Tray icon
             TrayIconBuilder::new()
+                .icon(app.default_window_icon().unwrap().clone())
                 .menu(&menu)
                 .show_menu_on_left_click(false)   // left click shows widget, not menu
                 .on_menu_event(|app, event| {

@@ -83,7 +83,7 @@ Authentication occurs only once, and the access token is stored locally.
 Clone the repository:
 
 ```
-git clone https://github.com/yourusername/lyrsagashi.git
+git clone https://github.com/Kanishak-xd/lyrsagashi.git
 cd lyrsagashi
 ```
 Install dependencies:
