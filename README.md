@@ -31,7 +31,8 @@ Designed to be **fast, minimal, and unobtrusive**, it lives quietly in the syste
 
 - **Tray-Based Workflow**  
   - Runs quietly in the system tray  
-  - Opens a compact widget when clicked  
+  - Opens a compact widget when left clicked
+  - Right click to show menu to close application
   - Automatically hides when focus is lost
 
 - **Zero Background Polling**  
