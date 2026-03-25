@@ -102,3 +102,9 @@ VITE_SPOTIFY_CLIENT_ID=your_spotify_client_id
 VITE_SPOTIFY_REDIRECT_URI=http://127.0.0.1:8888/callback
 ```
 You must also configure the same redirect URI in the Spotify Developer Dashboard.
+
+---
+
+## Download (Public Release)
+
+[Download Latest Release](https://github.com/Kanishak-xd/Lyrics-Finder/releases/latest)
