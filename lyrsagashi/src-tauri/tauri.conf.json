@@ -1,8 +1,8 @@
 {
   "$schema": "https://schema.tauri.app/config/2",
-  "productName": "lyrsagashi",
+  "productName": "Lyricat",
   "version": "0.1.0",
-  "identifier": "com.lyrsagashi.app",
+  "identifier": "com.lyricat.app",
   "build": {
     "beforeDevCommand": "npm run dev",
     "beforeBuildCommand": "npm run build",
@@ -13,7 +13,7 @@
     "withGlobalTauri": true,
     "windows": [
       {
-        "title": "lyrsagashi",
+        "title": "Lyricat",
         "width": 290,
         "height": 260,
         "resizable": false,

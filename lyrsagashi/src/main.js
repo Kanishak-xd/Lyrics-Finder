@@ -13,6 +13,18 @@ let currentSong      = "";
 let currentArtist    = "";
 let buttons;
 
+// ── UI state helpers ──────────────────────────────────────────────────────────
+
+function showMain() {
+  document.getElementById("mainCard").classList.remove("hidden");
+  document.getElementById("loginCard").classList.add("hidden");
+}
+
+function showLogin() {
+  document.getElementById("loginCard").classList.remove("hidden");
+  document.getElementById("mainCard").classList.add("hidden");
+}
+
 // ── Auth helpers ──────────────────────────────────────────────────────────────
 
 function generateRandomString(length) {
@@ -33,7 +45,8 @@ function base64urlencode(a) {
     .replace(/=+$/, "");
 }
 
-async function loginSpotify() {
+/** Build the Spotify auth URL (without opening the browser). */
+async function buildAuthUrl() {
   const verifier  = generateRandomString(64);
   localStorage.setItem("spotify_code_verifier", verifier);
   const challenge = base64urlencode(await sha256(verifier));
@@ -45,7 +58,12 @@ async function loginSpotify() {
     code_challenge_method: "S256",
     code_challenge: challenge,
   });
-  await openUrl(`https://accounts.spotify.com/authorize?${params}`);
+  return `https://accounts.spotify.com/authorize?${params}`;
+}
+
+async function loginSpotify() {
+  const url = await buildAuthUrl();
+  await openUrl(url);
 }
 
 async function exchangeToken(code) {
@@ -64,6 +82,7 @@ async function exchangeToken(code) {
   if (data.access_token) {
     localStorage.setItem("spotify_token", data.access_token);
     if (data.refresh_token) localStorage.setItem("spotify_refresh_token", data.refresh_token);
+    showMain();
     await fetchTrack();
   } else {
     console.error("Token exchange failed:", data);
@@ -161,7 +180,13 @@ function updateDisplay(song, artist) {
 async function fetchTrack() {
   try {
     const token = localStorage.getItem("spotify_token");
-    if (!token) { await loginSpotify(); return; }
+    if (!token) {
+      // No token — show the sign-in screen instead of silently popping browser
+      await showLoginScreen();
+      return;
+    }
+
+    showMain();
 
     const res = await fetch("https://api.spotify.com/v1/me/player/currently-playing", {
       headers: { Authorization: `Bearer ${token}` },
@@ -175,10 +200,10 @@ async function fetchTrack() {
     if (res.status === 401) {
       if (await refreshToken()) return fetchTrack();
       localStorage.removeItem("spotify_token");
-      await loginSpotify();
+      await showLoginScreen();
       return;
     }
-    if (!res.ok) { await loginSpotify(); return; }
+    if (!res.ok) { await showLoginScreen(); return; }
 
     const data    = await res.json();
     currentSong   = data.item.name;
@@ -189,6 +214,52 @@ async function fetchTrack() {
   } catch (err) {
     console.error("Spotify fetch failed:", err);
   }
+}
+
+// ── First-run login screen ────────────────────────────────────────────────────
+
+/**
+ * Shows the sign-in panel, builds the auth URL, populates the fallback link,
+ * and opens the browser automatically so the user just has to approve.
+ */
+async function showLoginScreen() {
+  showLogin();
+
+  // Build the URL first (stores the verifier in localStorage for later exchange)
+  const url = await buildAuthUrl();
+
+  // Set up the copy link button
+  const copyBtn = document.getElementById("authLinkBtn");
+  const copyText = document.getElementById("authLinkText");
+  if (copyBtn && copyText) {
+    copyBtn.onclick = async () => {
+      try {
+        await navigator.clipboard.writeText(url);
+        copyText.textContent = "Copied!";
+        copyBtn.style.color = "#1DB954";
+        copyBtn.querySelector('svg').style.color = "#1DB954";
+        copyBtn.querySelector('svg').style.opacity = "1";
+        setTimeout(() => {
+          copyText.textContent = "Copy login link";
+          copyBtn.style.color = "rgba(30,20,10,0.6)";
+          copyBtn.querySelector('svg').style.color = "currentColor";
+          copyBtn.querySelector('svg').style.opacity = "0.6";
+        }, 2000);
+      } catch (e) {
+        console.error("Failed to copy", e);
+      }
+    };
+  }
+
+  // Wire up the sign-in button
+  const btn = document.getElementById("spotifySignInBtn");
+  if (btn) {
+    // Replace onclick so we use the same URL (verifier already stored)
+    btn.onclick = () => openUrl(url);
+  }
+
+  // Auto-open the browser
+  await openUrl(url);
 }
 
 // ── Init ──────────────────────────────────────────────────────────────────────
@@ -215,12 +286,20 @@ window.addEventListener("DOMContentLoaded", async () => {
 
   updateToggleUI();
 
-  buttons = document.querySelectorAll("button");
+  buttons = document.querySelectorAll("#mainCard button");
   buttons.forEach(b => (b.disabled = true));
 
   await listen("spotify-code", async (e) => exchangeToken(e.payload));
 
-  window.fetchTrack = fetchTrack;
+  // Expose for Rust to call
+  window.fetchTrack     = fetchTrack;
+  window.showLoginScreen = showLoginScreen;
+  window.signOut = () => {
+    localStorage.removeItem("spotify_token");
+    localStorage.removeItem("spotify_refresh_token");
+    buttons.forEach(b => (b.disabled = true));
+    showLoginScreen();
+  };
 });
 
 // ── Open lyrics ───────────────────────────────────────────────────────────────

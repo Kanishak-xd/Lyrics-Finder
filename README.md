@@ -7,11 +7,11 @@
   <img src="https://img.shields.io/badge/JavaScript-F7DF1E?style=for-the-badge&logo=javascript&logoColor=black"/>
 </p>
 
-# LyricSagashii
+# Lyricat
 
-**LyricSagashii** is a lightweight desktop tray utility that instantly finds lyrics for the song currently playing on Spotify.
+**Lyricat** is a lightweight desktop tray utility that instantly finds lyrics for the song currently playing on Spotify.
 
-Instead of manually searching lyrics every time, LyricSagashii detects your currently playing Spotify track and opens the lyrics on your preferred site with a single click.
+Instead of manually searching lyrics every time, Lyricat detects your currently playing Spotify track and opens the lyrics on your preferred site with a single click.
 
 Designed to be **fast, minimal, and unobtrusive**, it lives quietly in the system tray and appears only when you need it.
 
@@ -69,7 +69,7 @@ No background services. No unnecessary resource usage.
 
 ## Spotify Authentication
 
-LyricSagashii uses the **Spotify Authorization Code Flow with PKCE**.
+Lyricat uses the **Spotify Authorization Code Flow with PKCE**.
 
 Permissions requested:
 user-read-currently-playing

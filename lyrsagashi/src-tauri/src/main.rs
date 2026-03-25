@@ -71,18 +71,49 @@ fn main() {
                 }
             });
 
-            // Right-click context menu 
-            let close_item = MenuItem::with_id(app, "quit", "Close Application", true, None::<&str>)?;
-            let menu = Menu::with_items(app, &[&close_item])?;
+            // Right-click context menu
+            let signout_item = MenuItem::with_id(app, "signout", "Sign Out", true, None::<&str>)?;
+            let close_item = MenuItem::with_id(app, "quit", "Close Lyricat", true, None::<&str>)?;
+            let menu = Menu::with_items(app, &[&signout_item, &close_item])?;
 
-            // Tray icon
+            // Tray icon: safe loading
+            // Try the default window icon first; if missing, load from bundled PNG;
+            // if that also fails, fall back to a tiny generated placeholder so we
+            // never panic and the tray is always created.
+            let tray_icon = app.default_window_icon()
+                .cloned()
+                .or_else(|| {
+                    // Try loading from the bundled icon file
+                    let resource_path = app.path().resource_dir()
+                        .ok()
+                        .map(|d| d.join("icons/32x32.png"));
+                    resource_path.and_then(|p| {
+                        std::fs::read(&p).ok().and_then(|bytes| {
+                            image::load_from_memory(&bytes).ok().map(|img| {
+                                let rgba = img.into_rgba8();
+                                let (width, height) = rgba.dimensions();
+                                tauri::image::Image::new_owned(rgba.into_raw(), width, height)
+                            })
+                        })
+                    })
+                })
+                .unwrap_or_else(|| {
+                    // Last-resort: a 4×4 solid red placeholder so the tray still appears
+                    let rgba: Vec<u8> = (0..16).flat_map(|_| [200u8, 50, 50, 255]).collect();
+                    tauri::image::Image::new_owned(rgba, 4, 4)
+                });
+
             TrayIconBuilder::new()
-                .icon(app.default_window_icon().unwrap().clone())
+                .icon(tray_icon)
                 .menu(&menu)
                 .show_menu_on_left_click(false)   // left click shows widget, not menu
                 .on_menu_event(|app, event| {
                     if event.id().as_ref() == "quit" {
                         app.exit(0);
+                    } else if event.id().as_ref() == "signout" {
+                        if let Some(window) = app.get_webview_window("main") {
+                            let _ = window.eval("window.signOut();");
+                        }
                     }
                 })
                 .on_tray_icon_event(move |tray, event| {
