@@ -258,8 +258,6 @@ async function showLoginScreen() {
     btn.onclick = () => openUrl(url);
   }
 
-  // Auto-open the browser
-  await openUrl(url);
 }
 
 // ── Init ──────────────────────────────────────────────────────────────────────

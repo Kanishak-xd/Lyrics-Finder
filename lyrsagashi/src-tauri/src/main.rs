@@ -11,6 +11,20 @@ fn main() {
     tauri::Builder::default()
         .plugin(tauri_plugin_shell::init())
         .plugin(tauri_plugin_opener::init())
+        .plugin(tauri_plugin_dialog::init())
+        .plugin(tauri_plugin_single_instance::init(|app, _args, _cwd| {
+            use tauri_plugin_dialog::DialogExt;
+            app.dialog()
+                .message("Only one instance of app is allowed to run at a time.\n\nLyricat is already running, you can access it from your system tray.")
+                .title("Lyricat is Already Running")
+                .kind(tauri_plugin_dialog::MessageDialogKind::Info)
+                .show(|_| {});
+            // Focus the running instance and show it 
+            if let Some(window) = app.get_webview_window("main") {
+                let _ = window.show();
+                let _ = window.set_focus();
+            }
+        }))
         .setup(|app| {
             let window = app.get_webview_window("main").unwrap();
             let _ = window.set_shadow(false);
