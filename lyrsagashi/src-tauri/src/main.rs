@@ -15,7 +15,7 @@ fn main() {
         .plugin(tauri_plugin_single_instance::init(|app, _args, _cwd| {
             use tauri_plugin_dialog::DialogExt;
             app.dialog()
-                .message("Only one instance of app is allowed to run at a time.\n\nLyricat is already running, you can access it from your system tray.")
+                .message("Only one instance of app is allowed to run at a time.\nLyricat is already running, you can access it from your system tray.")
                 .title("Lyricat is Already Running")
                 .kind(tauri_plugin_dialog::MessageDialogKind::Info)
                 .show(|_| {});
@@ -48,7 +48,7 @@ fn main() {
 
                         if let Some(code) = code {
                             let html = "<html><body style='font-family:sans-serif;text-align:center;padding-top:80px'>\
-                                <h2>&#x2705; Logged in!</h2><p>You can close this tab.</p></body></html>";
+                                <h2>Logged in!</h2><p>You can close this tab.</p></body></html>";
                             let response = tiny_http::Response::from_string(html)
                                 .with_header("Content-Type: text/html".parse::<tiny_http::Header>().unwrap());
                             let _ = request.respond(response);
