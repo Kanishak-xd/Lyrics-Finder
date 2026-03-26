@@ -3,11 +3,40 @@
 use tauri::{Manager, WindowEvent, Emitter};
 use tauri::tray::{TrayIconBuilder, TrayIconEvent, MouseButton};
 use tauri::menu::{Menu, MenuItem};
+use std::env;
 use std::sync::{Arc, Mutex};
 use std::time::{Instant, Duration};
 use std::thread;
 
+fn oauth_bind_addr_from_redirect_uri() -> Option<String> {
+    // Expected example: http://127.0.0.1:8888/callback
+    let uri = env::var("VITE_SPOTIFY_REDIRECT_URI").ok()?;
+    let without_scheme = uri
+        .strip_prefix("http://")
+        .or_else(|| uri.strip_prefix("https://"))?
+        .to_string();
+
+    let host_port = without_scheme.split('/').next()?.trim();
+    if host_port.is_empty() {
+        return None;
+    }
+
+    // tiny_http binds TCP; "localhost" may resolve to IPv6 on some systems.
+    // Bind explicitly to 127.0.0.1 when the redirect uses localhost.
+    let host_port = if host_port.to_lowercase().starts_with("localhost:") {
+        host_port.replacen("localhost:", "127.0.0.1:", 1)
+    } else {
+        host_port.to_string()
+    };
+
+    Some(host_port)
+}
+
 fn main() {
+    // Ensure `.env` is loaded in dev so the Rust side
+    // sees VITE_SPOTIFY_REDIRECT_URI too.
+    let _ = dotenvy::dotenv();
+
     tauri::Builder::default()
         .plugin(tauri_plugin_shell::init())
         .plugin(tauri_plugin_opener::init())
@@ -26,17 +55,37 @@ fn main() {
             }
         }))
         .setup(|app| {
+            use tauri_plugin_dialog::DialogExt;
             let window = app.get_webview_window("main").unwrap();
             let _ = window.set_shadow(false);
 
             // Spotify OAuth callback server
             let app_handle = app.handle().clone();
-            thread::spawn(move || {
-                let server = match tiny_http::Server::http("127.0.0.1:8888") {
-                    Ok(s) => s,
-                    Err(e) => { eprintln!("Failed to start OAuth server: {e}"); return; }
-                };
+            let bind_addr = oauth_bind_addr_from_redirect_uri()
+                .unwrap_or_else(|| "127.0.0.1:8888".to_string());
+            let callback_url = format!("http://{bind_addr}/callback");
 
+            let server = match tiny_http::Server::http(&bind_addr) {
+                Ok(s) => s,
+                Err(e) => {
+                    eprintln!("Failed to start OAuth server: {e}");
+                    app.dialog()
+                        .message(format!(
+                            "Lyricat couldn't start the local OAuth callback server at {callback_url}.\n\n\
+Common causes:\n\
+- Another app is using that port\n\
+- Your security software is blocking local loopback\n\n\
+Error: {e}\n\n\
+Fix: change `VITE_SPOTIFY_REDIRECT_URI` to a different local port (and update it in the Spotify Developer Dashboard), then restart the app."
+                        ))
+                        .title("Spotify Login Failed")
+                        .kind(tauri_plugin_dialog::MessageDialogKind::Error)
+                        .show(|_| {});
+                    return Ok(());
+                }
+            };
+
+            thread::spawn(move || {
                 for request in server.incoming_requests() {
                     let url = request.url().to_string();
                     if url.starts_with("/callback") {

@@ -1,12 +1,18 @@
 {
   "name": "lyricat",
   "private": true,
-  "version": "0.1.0",
+  "version": "1.0.2",
   "type": "module",
   "scripts": {
     "dev": "vite",
     "tauri": "tauri",
-    "build": "vite build"
+    "build": "vite build",
+    "sync:version": "node scripts/sync-tauri-version.mjs",
+    "version:patch": "npm version patch --no-git-tag-version && npm run sync:version",
+    "version:minor": "npm version minor --no-git-tag-version && npm run sync:version",
+    "version:major": "npm version major --no-git-tag-version && npm run sync:version",
+    "build:msi": "npm run sync:version && tauri build --bundles msi",
+    "build:msi:named": "npm run build:msi && node scripts/rename-msi.mjs"
   },
   "devDependencies": {
     "@tauri-apps/cli": "^2",

@@ -15,7 +15,6 @@ Instead of manually searching lyrics every time, Lyricat detects your currently 
 
 Designed to be **fast, minimal, and unobtrusive**, it lives quietly in the system tray and appears only when you need it.
 
----
 
 ## Features
 
@@ -49,7 +48,6 @@ Designed to be **fast, minimal, and unobtrusive**, it lives quietly in the syste
 
 No background services. No unnecessary resource usage.
 
----
 
 ## Tech Stack
 
@@ -65,7 +63,6 @@ No background services. No unnecessary resource usage.
 **APIs**
 - Spotify Web API
 
----
 
 ## Spotify Authentication
 
@@ -76,9 +73,18 @@ user-read-currently-playing
 user-read-playback-state
 Authentication occurs only once, and the access token is stored locally.
 
----
 
-## Installation (Development)
+## Users (Install)
+
+If you just want to run the app:
+
+1. Download the latest setup from the public releases: [Download Latest Release](https://github.com/Kanishak-xd/Lyrics-Finder/releases/latest)
+2. Install the app from setup on your Windows PC.
+3. Launch the app, go to system tray, click Lyricat app icon and click the Spotify sign-in button the first time.
+4. Sign-in with Spotify, click agree and go to system tray again, click app icon and it should be working.
+
+
+## Developers (Run from source)
 
 Clone the repository:
 
@@ -86,25 +92,26 @@ Clone the repository:
 git clone https://github.com/Kanishak-xd/lyrsagashi.git
 cd lyrsagashi
 ```
+
 Install dependencies:
+
 ```
 npm install
 ```
+
 Run the development build:
+
 ```
 npm run tauri dev
 ```
 
 ## Environment Variables
-Create a .env file in the project root:
+
+Create a `.env` file in the project root:
+
 ```
 VITE_SPOTIFY_CLIENT_ID=your_spotify_client_id
 VITE_SPOTIFY_REDIRECT_URI=http://127.0.0.1:8888/callback
 ```
+
 You must also configure the same redirect URI in the Spotify Developer Dashboard.
-
----
-
-## Download (Public Release)
-
-[Download Latest Release](https://github.com/Kanishak-xd/Lyrics-Finder/releases/latest)

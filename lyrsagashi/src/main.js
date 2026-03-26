@@ -13,8 +13,7 @@ let currentSong      = "";
 let currentArtist    = "";
 let buttons;
 
-// ── UI state helpers ──────────────────────────────────────────────────────────
-
+// UI state helpers
 function showMain() {
   document.getElementById("mainCard").classList.remove("hidden");
   document.getElementById("loginCard").classList.add("hidden");
@@ -25,8 +24,7 @@ function showLogin() {
   document.getElementById("mainCard").classList.add("hidden");
 }
 
-// ── Auth helpers ──────────────────────────────────────────────────────────────
-
+// Auth helpers
 function generateRandomString(length) {
   const chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789";
   let r = "";
@@ -110,8 +108,7 @@ async function refreshToken() {
   return false;
 }
 
-// ── Synced marquee ────────────────────────────────────────────────────────────
-
+// Synced marquee
 let marqueeFrame = null;
 
 function stopMarquee() {
@@ -175,8 +172,7 @@ function updateDisplay(song, artist) {
   requestAnimationFrame(() => requestAnimationFrame(() => startMarquee(songEl, artistEl)));
 }
 
-// ── Spotify fetch ─────────────────────────────────────────────────────────────
-
+// Spotify fetch
 async function fetchTrack() {
   try {
     const token = localStorage.getItem("spotify_token");
@@ -216,8 +212,7 @@ async function fetchTrack() {
   }
 }
 
-// ── First-run login screen ────────────────────────────────────────────────────
-
+// First-run login screen
 /**
  * Shows the sign-in panel, builds the auth URL, populates the fallback link,
  * and opens the browser automatically so the user just has to approve.
@@ -260,9 +255,16 @@ async function showLoginScreen() {
 
 }
 
-// ── Init ──────────────────────────────────────────────────────────────────────
-
+// Init
 window.addEventListener("DOMContentLoaded", async () => {
+  // Prevent the embedded webview context menu (Refresh/Save/Print) from
+  // showing up when the user right-clicks while the widget is open.
+  // The tray menu is handled by Rust and should be the only menu.
+  window.addEventListener("contextmenu", (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+  });
+
   const toggle = document.getElementById("romanToggle");
   const track  = document.getElementById("romanTrack");
   const thumb  = document.getElementById("romanThumb");
@@ -300,8 +302,7 @@ window.addEventListener("DOMContentLoaded", async () => {
   };
 });
 
-// ── Open lyrics ───────────────────────────────────────────────────────────────
-
+// Open lyrics
 window.openLyrics = async function(site) {
   if (!currentSong) return;
 

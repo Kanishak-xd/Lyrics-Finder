@@ -33,3 +33,4 @@ src-tauri/.cargo/
 # misc
 *.log
 *.tmp
+resources.md

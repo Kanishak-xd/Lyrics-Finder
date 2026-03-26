@@ -1,6 +1,6 @@
 [package]
 name = "lyricat"
-version = "0.1.0"
+version = "1.0.2"
 description = "Lyricat – lyrics finder system tray app"
 authors = ["you"]
 edition = "2021"
@@ -22,3 +22,4 @@ tiny_http = "0.12"
 image = "0.25"
 tauri-plugin-single-instance = "2.4.0"
 tauri-plugin-dialog = "2.6.0"
+dotenvy = "0.15"
