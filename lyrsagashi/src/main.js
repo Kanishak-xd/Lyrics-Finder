@@ -45,8 +45,11 @@ function base64urlencode(a) {
 
 /** Build the Spotify auth URL (without opening the browser). */
 async function buildAuthUrl() {
-  const verifier  = generateRandomString(64);
-  localStorage.setItem("spotify_code_verifier", verifier);
+  let verifier = localStorage.getItem("spotify_code_verifier");
+  if (!verifier) {
+    verifier = generateRandomString(64);
+    localStorage.setItem("spotify_code_verifier", verifier);
+  }
   const challenge = base64urlencode(await sha256(verifier));
   const params = new URLSearchParams({
     response_type: "code",
@@ -87,6 +90,7 @@ async function exchangeToken(code) {
   if (data.access_token) {
     localStorage.setItem("spotify_token", data.access_token);
     if (data.refresh_token) localStorage.setItem("spotify_refresh_token", data.refresh_token);
+    localStorage.removeItem("spotify_code_verifier");
     showMain();
     await fetchTrack();
   } else {
