@@ -98,6 +98,7 @@ Fix: change `VITE_SPOTIFY_REDIRECT_URI` to a different local port (and update it
                         });
 
                         if let Some(code) = code {
+                            let code = code.trim().to_string();
                             let html = "<html><body style='font-family:sans-serif;text-align:center;padding-top:80px'>\
                                 <h2>Logged in!</h2><p>You can close this tab.</p></body></html>";
                             let response = tiny_http::Response::from_string(html)

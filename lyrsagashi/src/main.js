@@ -24,6 +24,19 @@ function showLogin() {
   document.getElementById("mainCard").classList.add("hidden");
 }
 
+function setAuthStatus(message, isError = true) {
+  const el = document.getElementById("authStatus");
+  if (!el) return;
+  if (!message) {
+    el.textContent = "";
+    el.classList.add("hidden");
+    return;
+  }
+  el.textContent = message;
+  el.style.color = isError ? "#CC3A3A" : "rgba(30,20,10,0.55)";
+  el.classList.remove("hidden");
+}
+
 // Auth helpers
 function generateRandomString(length) {
   const chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789";
@@ -68,35 +81,57 @@ async function loginSpotify() {
 }
 
 async function exchangeToken(code) {
-  const verifier = localStorage.getItem("spotify_code_verifier");
-  if (!verifier) {
-    console.error("Missing PKCE verifier; restarting login flow.");
+  const normalizedCode = String(code ?? "").trim();
+  if (!normalizedCode) {
+    setAuthStatus("Missing auth code from callback. Please try sign-in again.");
     await showLoginScreen();
     return;
   }
 
-  const res = await fetch("https://accounts.spotify.com/api/token", {
-    method: "POST",
-    headers: { "Content-Type": "application/x-www-form-urlencoded" },
-    body: new URLSearchParams({
-      client_id: clientId,
-      grant_type: "authorization_code",
-      code,
-      redirect_uri: redirectUri,
-      code_verifier: verifier,
-    }),
-  });
-  const data = await res.json();
-  if (data.access_token) {
-    localStorage.setItem("spotify_token", data.access_token);
-    if (data.refresh_token) localStorage.setItem("spotify_refresh_token", data.refresh_token);
-    localStorage.removeItem("spotify_code_verifier");
-    showMain();
-    await fetchTrack();
-  } else {
+  const verifier = localStorage.getItem("spotify_code_verifier");
+  if (!verifier) {
+    console.error("Missing PKCE verifier; restarting login flow.");
+    setAuthStatus("Login session expired. Please sign in again.");
+    await showLoginScreen();
+    return;
+  }
+
+  setAuthStatus("Finishing Spotify login...", false);
+
+  try {
+    const res = await fetch("https://accounts.spotify.com/api/token", {
+      method: "POST",
+      headers: { "Content-Type": "application/x-www-form-urlencoded" },
+      body: new URLSearchParams({
+        client_id: clientId,
+        grant_type: "authorization_code",
+        code: normalizedCode,
+        redirect_uri: redirectUri,
+        code_verifier: verifier,
+      }),
+    });
+
+    const data = await res.json();
+    if (data.access_token) {
+      localStorage.setItem("spotify_token", data.access_token);
+      if (data.refresh_token) localStorage.setItem("spotify_refresh_token", data.refresh_token);
+      localStorage.removeItem("spotify_code_verifier");
+      setAuthStatus("");
+      showMain();
+      await fetchTrack();
+      return;
+    }
+
     console.error("Token exchange failed:", data);
     // Force a clean retry if Spotify rejected the code/verifier pair.
     localStorage.removeItem("spotify_code_verifier");
+    const reason = data?.error_description || data?.error || "Unknown OAuth error";
+    setAuthStatus(`Spotify login failed: ${reason}`);
+    await showLoginScreen();
+  } catch (err) {
+    console.error("Token exchange request failed:", err);
+    localStorage.removeItem("spotify_code_verifier");
+    setAuthStatus("Couldn't reach Spotify token server. Please check connection and try again.");
     await showLoginScreen();
   }
 }
@@ -233,6 +268,7 @@ async function fetchTrack() {
  */
 async function showLoginScreen() {
   showLogin();
+  setAuthStatus("");
 
   // Build the URL first (stores the verifier in localStorage for later exchange)
   const url = await buildAuthUrl();
@@ -307,9 +343,9 @@ window.addEventListener("DOMContentLoaded", async () => {
     const rawCode = String(e.payload ?? "");
     const code = (() => {
       try {
-        return decodeURIComponent(rawCode);
+        return decodeURIComponent(rawCode).trim();
       } catch {
-        return rawCode;
+        return rawCode.trim();
       }
     })();
     await exchangeToken(code);
