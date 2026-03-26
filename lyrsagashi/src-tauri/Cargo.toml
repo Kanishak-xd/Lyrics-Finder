@@ -1,6 +1,6 @@
 [package]
 name = "lyricat"
-version = "1.0.2"
+version = "1.0.3"
 description = "Lyricat – lyrics finder system tray app"
 authors = ["you"]
 edition = "2021"
@@ -11,6 +11,7 @@ crate-type = ["staticlib", "cdylib", "rlib"]
 
 [build-dependencies]
 tauri-build = { version = "2", features = [] }
+dotenvy = "0.15"
 
 [dependencies]
 tauri = { version = "2", features = ["tray-icon"] }

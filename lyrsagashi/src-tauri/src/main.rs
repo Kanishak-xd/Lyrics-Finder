@@ -10,7 +10,9 @@ use std::thread;
 
 fn oauth_bind_addr_from_redirect_uri() -> Option<String> {
     // Expected example: http://127.0.0.1:8888/callback
-    let uri = env::var("VITE_SPOTIFY_REDIRECT_URI").ok()?;
+    let uri = env::var("VITE_SPOTIFY_REDIRECT_URI")
+        .ok()
+        .or_else(|| option_env!("SPOTIFY_REDIRECT_URI").map(|s| s.to_string()))?;
     let without_scheme = uri
         .strip_prefix("http://")
         .or_else(|| uri.strip_prefix("https://"))?
@@ -62,7 +64,7 @@ fn main() {
             // Spotify OAuth callback server
             let app_handle = app.handle().clone();
             let bind_addr = oauth_bind_addr_from_redirect_uri()
-                .unwrap_or_else(|| "127.0.0.1:8888".to_string());
+                .unwrap_or_else(|| "127.0.0.1:4381".to_string());
             let callback_url = format!("http://{bind_addr}/callback");
 
             let server = match tiny_http::Server::http(&bind_addr) {
