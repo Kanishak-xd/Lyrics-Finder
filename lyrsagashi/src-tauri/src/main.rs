@@ -9,7 +9,6 @@ use std::time::{Instant, Duration};
 use std::thread;
 
 fn oauth_bind_addr_from_redirect_uri() -> Option<String> {
-    // Expected example: http://127.0.0.1:8888/callback
     let uri = env::var("VITE_SPOTIFY_REDIRECT_URI")
         .ok()
         .or_else(|| option_env!("SPOTIFY_REDIRECT_URI").map(|s| s.to_string()))?;
@@ -23,8 +22,6 @@ fn oauth_bind_addr_from_redirect_uri() -> Option<String> {
         return None;
     }
 
-    // tiny_http binds TCP; "localhost" may resolve to IPv6 on some systems.
-    // Bind explicitly to 127.0.0.1 when the redirect uses localhost.
     let host_port = if host_port.to_lowercase().starts_with("localhost:") {
         host_port.replacen("localhost:", "127.0.0.1:", 1)
     } else {
@@ -35,8 +32,6 @@ fn oauth_bind_addr_from_redirect_uri() -> Option<String> {
 }
 
 fn main() {
-    // Ensure `.env` is loaded in dev so the Rust side
-    // sees VITE_SPOTIFY_REDIRECT_URI too.
     let _ = dotenvy::dotenv();
 
     tauri::Builder::default()
@@ -50,7 +45,6 @@ fn main() {
                 .title("Lyricat is Already Running")
                 .kind(tauri_plugin_dialog::MessageDialogKind::Info)
                 .show(|_| {});
-            // Focus the running instance and show it 
             if let Some(window) = app.get_webview_window("main") {
                 let _ = window.show();
                 let _ = window.set_focus();
@@ -104,7 +98,20 @@ Fix: change `VITE_SPOTIFY_REDIRECT_URI` to a different local port (and update it
                             let response = tiny_http::Response::from_string(html)
                                 .with_header("Content-Type: text/html".parse::<tiny_http::Header>().unwrap());
                             let _ = request.respond(response);
+
                             if let Some(win) = app_handle.get_webview_window("main") {
+                                // *** Show and focus the window BEFORE emitting the event.
+                                // When the user is in the browser completing OAuth, the webview
+                                // is hidden. Tauri's emit() can be dropped or go unprocessed
+                                // if the webview isn't active. Showing it first ensures the JS
+                                // event listener is live when the event arrives.
+                                let _ = win.show();
+                                let _ = win.set_focus();
+
+                                // Small delay to let the webview resume JS execution
+                                // before the event fires.
+                                thread::sleep(Duration::from_millis(150));
+
                                 let _ = win.emit("spotify-code", code);
                             }
                         } else {
@@ -142,14 +149,9 @@ Fix: change `VITE_SPOTIFY_REDIRECT_URI` to a different local port (and update it
             let close_item = MenuItem::with_id(app, "quit", "Close Lyricat", true, None::<&str>)?;
             let menu = Menu::with_items(app, &[&signout_item, &close_item])?;
 
-            // Tray icon: safe loading
-            // Try the default window icon first; if missing, load from bundled PNG;
-            // if that also fails, fall back to a tiny generated placeholder so we
-            // never panic and the tray is always created.
             let tray_icon = app.default_window_icon()
                 .cloned()
                 .or_else(|| {
-                    // Try loading from the bundled icon file
                     let resource_path = app.path().resource_dir()
                         .ok()
                         .map(|d| d.join("icons/32x32.png"));
@@ -164,7 +166,6 @@ Fix: change `VITE_SPOTIFY_REDIRECT_URI` to a different local port (and update it
                     })
                 })
                 .unwrap_or_else(|| {
-                    // Last-resort: a 4×4 solid red placeholder so the tray still appears
                     let rgba: Vec<u8> = (0..16).flat_map(|_| [200u8, 50, 50, 255]).collect();
                     tauri::image::Image::new_owned(rgba, 4, 4)
                 });
@@ -172,7 +173,7 @@ Fix: change `VITE_SPOTIFY_REDIRECT_URI` to a different local port (and update it
             TrayIconBuilder::new()
                 .icon(tray_icon)
                 .menu(&menu)
-                .show_menu_on_left_click(false)   // left click shows widget, not menu
+                .show_menu_on_left_click(false)
                 .on_menu_event(|app, event| {
                     if event.id().as_ref() == "quit" {
                         app.exit(0);

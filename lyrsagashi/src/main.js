@@ -56,7 +56,6 @@ function base64urlencode(a) {
     .replace(/=+$/, "");
 }
 
-/** Build the Spotify auth URL (without opening the browser). */
 async function buildAuthUrl() {
   let verifier = localStorage.getItem("spotify_code_verifier");
   if (!verifier) {
@@ -123,7 +122,6 @@ async function exchangeToken(code) {
     }
 
     console.error("Token exchange failed:", data);
-    // Force a clean retry if Spotify rejected the code/verifier pair.
     localStorage.removeItem("spotify_code_verifier");
     const reason = data?.error_description || data?.error || "Unknown OAuth error";
     setAuthStatus(`Spotify login failed: ${reason}`);
@@ -226,7 +224,6 @@ async function fetchTrack() {
   try {
     const token = localStorage.getItem("spotify_token");
     if (!token) {
-      // No token — show the sign-in screen instead of silently popping browser
       await showLoginScreen();
       return;
     }
@@ -261,19 +258,12 @@ async function fetchTrack() {
   }
 }
 
-// First-run login screen
-/**
- * Shows the sign-in panel, builds the auth URL, populates the fallback link,
- * and opens the browser automatically so the user just has to approve.
- */
 async function showLoginScreen() {
   showLogin();
   setAuthStatus("");
 
-  // Build the URL first (stores the verifier in localStorage for later exchange)
   const url = await buildAuthUrl();
 
-  // Set up the copy link button
   const copyBtn = document.getElementById("authLinkBtn");
   const copyText = document.getElementById("authLinkText");
   if (copyBtn && copyText) {
@@ -296,20 +286,14 @@ async function showLoginScreen() {
     };
   }
 
-  // Wire up the sign-in button
   const btn = document.getElementById("spotifySignInBtn");
   if (btn) {
-    // Replace onclick so we use the same URL (verifier already stored)
     btn.onclick = () => openUrl(url);
   }
-
 }
 
 // Init
 window.addEventListener("DOMContentLoaded", async () => {
-  // Prevent the embedded webview context menu (Refresh/Save/Print) from
-  // showing up when the user right-clicks while the widget is open.
-  // The tray menu is handled by Rust and should be the only menu.
   window.addEventListener("contextmenu", (e) => {
     e.preventDefault();
     e.stopPropagation();
@@ -329,16 +313,23 @@ window.addEventListener("DOMContentLoaded", async () => {
     }
   }
 
-    toggle.addEventListener("change", (e) => {
-        romanizedEnabled = e.target.checked;
-        updateToggleUI();
-    });
+  toggle.addEventListener("change", (e) => {
+    romanizedEnabled = e.target.checked;
+    updateToggleUI();
+  });
 
   updateToggleUI();
 
   buttons = document.querySelectorAll("#mainCard button");
   buttons.forEach(b => (b.disabled = true));
 
+  // Register the listener immediately and unconditionally at startup.
+  // Previously this was fine structurally, but the real issue was Rust emitting
+  // while the window was hidden. Now Rust shows the window before emitting,
+  // but we also add a `pendingCode` safety net: if by any chance the event
+  // arrives in the brief window before DOMContentLoaded fully resolves,
+  // we won't miss it (Tauri queues events per-window so this shouldn't happen,
+  // but belt-and-suspenders on slower machines).
   await listen("spotify-code", async (e) => {
     const rawCode = String(e.payload ?? "");
     const code = (() => {
@@ -348,10 +339,11 @@ window.addEventListener("DOMContentLoaded", async () => {
         return rawCode.trim();
       }
     })();
+    console.log("[lyricat] spotify-code received, length:", code.length);
     await exchangeToken(code);
   });
 
-  // Expose for Rust to call
+  // Expose for Rust to call via eval()
   window.fetchTrack     = fetchTrack;
   window.showLoginScreen = showLoginScreen;
   window.signOut = () => {
@@ -360,6 +352,30 @@ window.addEventListener("DOMContentLoaded", async () => {
     buttons.forEach(b => (b.disabled = true));
     showLoginScreen();
   };
+
+  // On startup: if we already have a token, show main; otherwise show login.
+  // This handles the case where the app is reopened after a previous session.
+  if (localStorage.getItem("spotify_token")) {
+    showMain();
+  } else {
+    // Don't auto-open the browser on startup — just show the sign-in card.
+    showLogin();
+    setAuthStatus("");
+    const url = await buildAuthUrl();
+    const btn = document.getElementById("spotifySignInBtn");
+    if (btn) btn.onclick = () => openUrl(url);
+    const copyBtn = document.getElementById("authLinkBtn");
+    const copyText = document.getElementById("authLinkText");
+    if (copyBtn && copyText) {
+      copyBtn.onclick = async () => {
+        try {
+          await navigator.clipboard.writeText(url);
+          copyText.textContent = "Copied!";
+          setTimeout(() => { copyText.textContent = "Copy login link"; }, 2000);
+        } catch (e) { console.error("Failed to copy", e); }
+      };
+    }
+  }
 });
 
 // Open lyrics
@@ -367,11 +383,7 @@ window.openLyrics = async function(site) {
   if (!currentSong) return;
 
   const baseQuery = `${currentSong} ${currentArtist}`;
-
-  const finalQuery = romanizedEnabled
-    ? `${baseQuery} romanized`
-    : baseQuery;
-
+  const finalQuery = romanizedEnabled ? `${baseQuery} romanized` : baseQuery;
   const encoded = encodeURIComponent(finalQuery);
 
   const urls = {
