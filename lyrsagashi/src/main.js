@@ -65,6 +65,13 @@ async function loginSpotify() {
 }
 
 async function exchangeToken(code) {
+  const verifier = localStorage.getItem("spotify_code_verifier");
+  if (!verifier) {
+    console.error("Missing PKCE verifier; restarting login flow.");
+    await showLoginScreen();
+    return;
+  }
+
   const res = await fetch("https://accounts.spotify.com/api/token", {
     method: "POST",
     headers: { "Content-Type": "application/x-www-form-urlencoded" },
@@ -73,7 +80,7 @@ async function exchangeToken(code) {
       grant_type: "authorization_code",
       code,
       redirect_uri: redirectUri,
-      code_verifier: localStorage.getItem("spotify_code_verifier"),
+      code_verifier: verifier,
     }),
   });
   const data = await res.json();
@@ -84,6 +91,9 @@ async function exchangeToken(code) {
     await fetchTrack();
   } else {
     console.error("Token exchange failed:", data);
+    // Force a clean retry if Spotify rejected the code/verifier pair.
+    localStorage.removeItem("spotify_code_verifier");
+    await showLoginScreen();
   }
 }
 
@@ -289,7 +299,17 @@ window.addEventListener("DOMContentLoaded", async () => {
   buttons = document.querySelectorAll("#mainCard button");
   buttons.forEach(b => (b.disabled = true));
 
-  await listen("spotify-code", async (e) => exchangeToken(e.payload));
+  await listen("spotify-code", async (e) => {
+    const rawCode = String(e.payload ?? "");
+    const code = (() => {
+      try {
+        return decodeURIComponent(rawCode);
+      } catch {
+        return rawCode;
+      }
+    })();
+    await exchangeToken(code);
+  });
 
   // Expose for Rust to call
   window.fetchTrack     = fetchTrack;

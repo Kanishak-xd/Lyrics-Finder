@@ -92,9 +92,9 @@ Fix: change `VITE_SPOTIFY_REDIRECT_URI` to a different local port (and update it
                     let url = request.url().to_string();
                     if url.starts_with("/callback") {
                         let code = url.split('?').nth(1).and_then(|qs| {
-                            qs.split('&')
-                                .find(|p| p.starts_with("code="))
-                                .map(|p| p["code=".len()..].to_string())
+                            url::form_urlencoded::parse(qs.as_bytes())
+                                .find(|(k, _)| k == "code")
+                                .map(|(_, v)| v.into_owned())
                         });
 
                         if let Some(code) = code {
