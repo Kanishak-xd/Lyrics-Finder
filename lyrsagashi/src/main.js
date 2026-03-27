@@ -92,6 +92,9 @@ async function loginSpotify() {
   await openUrl(url);
 }
 
+let lastCode = null;
+let isExchanging = false;
+
 async function exchangeToken(code) {
   const normalizedCode = String(code ?? "").trim();
   if (!normalizedCode) {
@@ -100,6 +103,19 @@ async function exchangeToken(code) {
     await showLoginScreen();
     return;
   }
+
+  if (normalizedCode === lastCode) {
+    log("Skipping duplicate code exchange");
+    return;
+  }
+  
+  if (isExchanging) {
+    log("Already exchanging a token, ignoring concurrent request.");
+    return;
+  }
+  
+  isExchanging = true;
+  lastCode = normalizedCode;
 
   const verifier = localStorage.getItem("spotify_code_verifier");
   if (!verifier) {
@@ -134,6 +150,7 @@ async function exchangeToken(code) {
       setAuthStatus("");
       showMain();
       await fetchTrack();
+      isExchanging = false;
       return;
     }
 
@@ -147,6 +164,8 @@ async function exchangeToken(code) {
     localStorage.removeItem("spotify_code_verifier");
     setAuthStatus("Couldn't reach Spotify token server. Please check connection and try again.");
     await showLoginScreen();
+  } finally {
+    isExchanging = false;
   }
 }
 
@@ -261,11 +280,22 @@ async function fetchTrack() {
       await showLoginScreen();
       return;
     }
-    if (!res.ok) { await showLoginScreen(); return; }
+    if (!res.ok) { 
+      log(`Spotify API error. Code: ${res.status}`);
+      updateDisplay("Playback unavailable", `API Error ${res.status}`);
+      buttons.forEach(b => (b.disabled = true));
+      return; 
+    }
 
-    const data    = await res.json();
+    const data = await res.json();
+    if (!data.item) {
+      updateDisplay("Nothing playing", "Open Spotify and play something");
+      buttons.forEach(b => (b.disabled = true));
+      return;
+    }
+
     currentSong   = data.item.name;
-    currentArtist = data.item.artists.map(a => a.name).join(", ");
+    currentArtist = data.item.artists ? data.item.artists.map(a => a.name).join(", ") : "Unknown Artist";
     updateDisplay(currentSong, currentArtist);
     buttons.forEach(b => (b.disabled = false));
 
