@@ -4,9 +4,20 @@ import { listen } from "@tauri-apps/api/event";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 
 const clientId = import.meta.env.VITE_SPOTIFY_CLIENT_ID;
-const redirectUri = import.meta.env.VITE_SPOTIFY_REDIRECT_URI;
 
 const win = getCurrentWindow();
+
+function log(msg) {
+  console.log(msg);
+  try {
+    window.__TAURI__.invoke("log_message", { message: msg });
+  } catch {}
+}
+
+async function getRedirectUri() {
+  const port = await window.__TAURI__.invoke("get_oauth_port").catch(() => 4381);
+  return `http://127.0.0.1:${port}/callback`;
+}
 
 let romanizedEnabled = true;
 let currentSong      = "";
@@ -63,11 +74,12 @@ async function buildAuthUrl() {
     localStorage.setItem("spotify_code_verifier", verifier);
   }
   const challenge = base64urlencode(await sha256(verifier));
+  const uri = await getRedirectUri();
   const params = new URLSearchParams({
     response_type: "code",
     client_id: clientId,
     scope: "user-read-currently-playing user-read-playback-state",
-    redirect_uri: redirectUri,
+    redirect_uri: uri,
     code_challenge_method: "S256",
     code_challenge: challenge,
   });
@@ -83,6 +95,7 @@ async function exchangeToken(code) {
   const normalizedCode = String(code ?? "").trim();
   if (!normalizedCode) {
     setAuthStatus("Missing auth code from callback. Please try sign-in again.");
+    log("Exchange aborted: missing auth code");
     await showLoginScreen();
     return;
   }
@@ -90,6 +103,7 @@ async function exchangeToken(code) {
   const verifier = localStorage.getItem("spotify_code_verifier");
   if (!verifier) {
     console.error("Missing PKCE verifier; restarting login flow.");
+    log("Exchange aborted: missing PKCE verifier");
     setAuthStatus("Login session expired. Please sign in again.");
     await showLoginScreen();
     return;
@@ -105,7 +119,7 @@ async function exchangeToken(code) {
         client_id: clientId,
         grant_type: "authorization_code",
         code: normalizedCode,
-        redirect_uri: redirectUri,
+        redirect_uri: await getRedirectUri(),
         code_verifier: verifier,
       }),
     });
@@ -115,6 +129,7 @@ async function exchangeToken(code) {
       localStorage.setItem("spotify_token", data.access_token);
       if (data.refresh_token) localStorage.setItem("spotify_refresh_token", data.refresh_token);
       localStorage.removeItem("spotify_code_verifier");
+      try { await window.__TAURI__.invoke("clear_oauth_code"); } catch {}
       setAuthStatus("");
       showMain();
       await fetchTrack();
@@ -294,6 +309,8 @@ async function showLoginScreen() {
 
 // Init
 window.addEventListener("DOMContentLoaded", async () => {
+  log("[INIT] App started");
+
   window.addEventListener("contextmenu", (e) => {
     e.preventDefault();
     e.stopPropagation();
@@ -339,7 +356,8 @@ window.addEventListener("DOMContentLoaded", async () => {
         return rawCode.trim();
       }
     })();
-    console.log("[lyricat] spotify-code received, length:", code.length);
+    log("[EVENT] spotify-code received (hidden from logs)");
+    try { await window.__TAURI__.invoke("ack_oauth_received"); } catch {}
     await exchangeToken(code);
   });
 
@@ -353,10 +371,15 @@ window.addEventListener("DOMContentLoaded", async () => {
     showLoginScreen();
   };
 
-  // On startup: if we already have a token, show main; otherwise show login.
-  // This handles the case where the app is reopened after a previous session.
-  if (localStorage.getItem("spotify_token")) {
+  // On startup: check for pending code first
+  const pendingCode = await window.__TAURI__.invoke("read_oauth_code").catch(() => null);
+
+  if (pendingCode) {
+    log("Recovered OAuth code from file on startup");
+    await exchangeToken(pendingCode);
+  } else if (localStorage.getItem("spotify_token")) {
     showMain();
+    fetchTrack();
   } else {
     // Don't auto-open the browser on startup — just show the sign-in card.
     showLogin();
@@ -376,6 +399,16 @@ window.addEventListener("DOMContentLoaded", async () => {
       };
     }
   }
+
+  setInterval(async () => {
+    if (!navigator.onLine) return;
+    if (!localStorage.getItem("spotify_token")) return;
+    try {
+      await fetchTrack();
+    } catch (e) {
+      log("Retry fetch failed: " + e.message);
+    }
+  }, 5000);
 });
 
 // Open lyrics

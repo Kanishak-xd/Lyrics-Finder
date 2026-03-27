@@ -1,12 +1,61 @@
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
-use tauri::{Manager, WindowEvent, Emitter};
+use tauri::{Manager, WindowEvent, Emitter, State};
 use tauri::tray::{TrayIconBuilder, TrayIconEvent, MouseButton};
 use tauri::menu::{Menu, MenuItem};
 use std::env;
 use std::sync::{Arc, Mutex};
 use std::time::{Instant, Duration};
 use std::thread;
+use std::fs::{OpenOptions, create_dir_all};
+use std::io::Write;
+
+struct AppState {
+    oauth_port: Mutex<u16>,
+    oauth_ack: Mutex<bool>,
+}
+
+fn log_to_file(message: &str) {
+    let base = std::env::var("LOCALAPPDATA").unwrap_or_else(|_| ".".into());
+    let dir = format!("{}\\Lyricat", base);
+    let _ = create_dir_all(&dir);
+    let path = format!("{}\\logs.txt", dir);
+
+    if let Ok(mut file) = OpenOptions::new().create(true).append(true).open(path) {
+        let _ = writeln!(file, "{}", message);
+    }
+}
+
+#[tauri::command]
+fn log_message(message: String) {
+    log_to_file(&format!("[JS] {}", message));
+}
+
+#[tauri::command]
+fn get_oauth_port(state: State<'_, AppState>) -> u16 {
+    *state.oauth_port.lock().unwrap()
+}
+
+#[tauri::command]
+fn ack_oauth_received(state: State<'_, AppState>) {
+    *state.oauth_ack.lock().unwrap() = true;
+    log_to_file("Frontend acknowledged OAuth code");
+}
+
+#[tauri::command]
+fn read_oauth_code() -> Option<String> {
+    let base = std::env::var("LOCALAPPDATA").unwrap_or_else(|_| ".".into());
+    let path = format!("{}\\Lyricat\\oauth_code.txt", base);
+    std::fs::read_to_string(path).ok().map(|s| s.trim().to_string())
+}
+
+#[tauri::command]
+fn clear_oauth_code() {
+    let base = std::env::var("LOCALAPPDATA").unwrap_or_else(|_| ".".into());
+    let path = format!("{}\\Lyricat\\oauth_code.txt", base);
+    let _ = std::fs::remove_file(path);
+    log_to_file("Cleared oauth_code.txt");
+}
 
 fn oauth_bind_addr_from_redirect_uri() -> Option<String> {
     let uri = env::var("VITE_SPOTIFY_REDIRECT_URI")
@@ -34,6 +83,9 @@ fn oauth_bind_addr_from_redirect_uri() -> Option<String> {
 fn main() {
     let _ = dotenvy::dotenv();
 
+    log_to_file("===============================");
+    log_to_file("App started");
+
     tauri::Builder::default()
         .plugin(tauri_plugin_shell::init())
         .plugin(tauri_plugin_opener::init())
@@ -50,6 +102,13 @@ fn main() {
                 let _ = window.set_focus();
             }
         }))
+        .invoke_handler(tauri::generate_handler![
+            log_message,
+            get_oauth_port,
+            ack_oauth_received,
+            read_oauth_code,
+            clear_oauth_code
+        ])
         .setup(|app| {
             use tauri_plugin_dialog::DialogExt;
             let window = app.get_webview_window("main").unwrap();
@@ -57,29 +116,57 @@ fn main() {
 
             // Spotify OAuth callback server
             let app_handle = app.handle().clone();
+            
+            // Extract the original host (e.g., 127.0.0.1) from env or use default.
             let bind_addr = oauth_bind_addr_from_redirect_uri()
                 .unwrap_or_else(|| "127.0.0.1:4381".to_string());
-            let callback_url = format!("http://{bind_addr}/callback");
+            let hostname = bind_addr.split(':').next().unwrap_or("127.0.0.1").to_string();
 
-            let server = match tiny_http::Server::http(&bind_addr) {
-                Ok(s) => s,
-                Err(e) => {
-                    eprintln!("Failed to start OAuth server: {e}");
-                    app.dialog()
-                        .message(format!(
-                            "Lyricat couldn't start the local OAuth callback server at {callback_url}.\n\n\
+            // Fallback ports
+            let ports = vec![4381, 4382, 4383];
+            let mut bound_server = None;
+
+            for port in &ports {
+                let addr = format!("{}:{}", hostname, port);
+                match tiny_http::Server::http(&addr) {
+                    Ok(s) => {
+                        log_to_file(&format!("Bound OAuth server to {}", addr));
+                        bound_server = Some((s, *port));
+                        break;
+                    }
+                    Err(e) => {
+                        log_to_file(&format!("Failed to bind port {}: {}", port, e));
+                    }
+                }
+            }
+
+            let (server, bound_port) = match bound_server {
+                Some(s) => s,
+                None => {
+                    let e_msg = format!(
+                        "Lyricat couldn't start the local OAuth callback server.\n\n\
+Tried ports: {:?}\n\
 Common causes:\n\
-- Another app is using that port\n\
+- Another app is using those ports\n\
 - Your security software is blocking local loopback\n\n\
-Error: {e}\n\n\
-Fix: change `VITE_SPOTIFY_REDIRECT_URI` to a different local port (and update it in the Spotify Developer Dashboard), then restart the app."
-                        ))
+Fix: free up port 4381/4382 and restart the app.",
+                        ports
+                    );
+                    log_to_file("Failed to bind any OAuth server ports.");
+                    app.dialog()
+                        .message(&e_msg)
                         .title("Spotify Login Failed")
                         .kind(tauri_plugin_dialog::MessageDialogKind::Error)
                         .show(|_| {});
                     return Ok(());
                 }
             };
+
+            // Manage the global state
+            app.manage(AppState {
+                oauth_port: Mutex::new(bound_port),
+                oauth_ack: Mutex::new(false),
+            });
 
             thread::spawn(move || {
                 for request in server.incoming_requests() {
@@ -93,28 +180,43 @@ Fix: change `VITE_SPOTIFY_REDIRECT_URI` to a different local port (and update it
 
                         if let Some(code) = code {
                             let code = code.trim().to_string();
+                            log_to_file("OAuth callback received code");
+
+                            // Store to file persistently
+                            let base = std::env::var("LOCALAPPDATA").unwrap_or_else(|_| ".".into());
+                            let dir = format!("{}\\Lyricat", base);
+                            let _ = create_dir_all(&dir);
+                            let path = format!("{}\\oauth_code.txt", dir);
+                            let _ = std::fs::write(&path, &code);
+                            log_to_file("Stored OAuth code to file");
+
                             let html = "<html><body style='font-family:sans-serif;text-align:center;padding-top:80px'>\
                                 <h2>Logged in!</h2><p>You can close this tab.</p></body></html>";
                             let response = tiny_http::Response::from_string(html)
                                 .with_header("Content-Type: text/html".parse::<tiny_http::Header>().unwrap());
                             let _ = request.respond(response);
 
+                            let state = app_handle.state::<AppState>();
+                            *state.oauth_ack.lock().unwrap() = false; // Reset ack for a new emit
+
                             if let Some(win) = app_handle.get_webview_window("main") {
-                                // *** Show and focus the window BEFORE emitting the event.
-                                // When the user is in the browser completing OAuth, the webview
-                                // is hidden. Tauri's emit() can be dropped or go unprocessed
-                                // if the webview isn't active. Showing it first ensures the JS
-                                // event listener is live when the event arrives.
+                                // Show and focus BEFORE emitting
                                 let _ = win.show();
                                 let _ = win.set_focus();
 
-                                // Small delay to let the webview resume JS execution
-                                // before the event fires.
-                                thread::sleep(Duration::from_millis(150));
-
-                                let _ = win.emit("spotify-code", code);
+                                // Emit retry loop
+                                for i in 0..5 {
+                                    if *state.oauth_ack.lock().unwrap() {
+                                        log_to_file("OAuth code acknowledged by frontend. Stopping emit loop.");
+                                        break;
+                                    }
+                                    log_to_file(&format!("Emitting spotify-code attempt {}", i + 1));
+                                    let _ = win.emit("spotify-code", code.clone());
+                                    thread::sleep(Duration::from_millis(200));
+                                }
                             }
                         } else {
+                            log_to_file("OAuth callback received request, but missing code");
                             let _ = request.respond(
                                 tiny_http::Response::from_string("Missing code").with_status_code(400)
                             );
