@@ -2,6 +2,7 @@ import "./styles.css";
 import { openUrl } from "@tauri-apps/plugin-opener";
 import { listen } from "@tauri-apps/api/event";
 import { getCurrentWindow } from "@tauri-apps/api/window";
+import { invoke } from "@tauri-apps/api/core";
 
 const clientId = import.meta.env.VITE_SPOTIFY_CLIENT_ID;
 
@@ -10,12 +11,12 @@ const win = getCurrentWindow();
 function log(msg) {
   console.log(msg);
   try {
-    window.__TAURI__.invoke("log_message", { message: msg });
+    invoke("log_message", { message: msg });
   } catch {}
 }
 
 async function getRedirectUri() {
-  const port = await window.__TAURI__.invoke("get_oauth_port").catch(() => 4381);
+  const port = await invoke("get_oauth_port").catch(() => 4381);
   return `http://127.0.0.1:${port}/callback`;
 }
 
@@ -129,7 +130,7 @@ async function exchangeToken(code) {
       localStorage.setItem("spotify_token", data.access_token);
       if (data.refresh_token) localStorage.setItem("spotify_refresh_token", data.refresh_token);
       localStorage.removeItem("spotify_code_verifier");
-      try { await window.__TAURI__.invoke("clear_oauth_code"); } catch {}
+      try { await invoke("clear_oauth_code"); } catch {}
       setAuthStatus("");
       showMain();
       await fetchTrack();
@@ -357,7 +358,7 @@ window.addEventListener("DOMContentLoaded", async () => {
       }
     })();
     log("[EVENT] spotify-code received (hidden from logs)");
-    try { await window.__TAURI__.invoke("ack_oauth_received"); } catch {}
+    try { await invoke("ack_oauth_received"); } catch {}
     await exchangeToken(code);
   });
 
@@ -372,7 +373,7 @@ window.addEventListener("DOMContentLoaded", async () => {
   };
 
   // On startup: check for pending code first
-  const pendingCode = await window.__TAURI__.invoke("read_oauth_code").catch(() => null);
+  const pendingCode = await invoke("read_oauth_code").catch(() => null);
 
   if (pendingCode) {
     log("Recovered OAuth code from file on startup");
