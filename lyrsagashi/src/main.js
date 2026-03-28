@@ -3,7 +3,6 @@ import { openUrl } from "@tauri-apps/plugin-opener";
 import { listen } from "@tauri-apps/api/event";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import { invoke } from "@tauri-apps/api/core";
-
 const clientId = import.meta.env.VITE_SPOTIFY_CLIENT_ID;
 
 const win = getCurrentWindow();
@@ -343,8 +342,8 @@ async function showLoginScreen() {
   }
 }
 
-// Init
-window.addEventListener("DOMContentLoaded", async () => {
+// Init — keep sync work minimal so the window can paint; defer IPC / auth setup.
+window.addEventListener("DOMContentLoaded", () => {
   log("[INIT] App started");
 
   window.addEventListener("contextmenu", (e) => {
@@ -376,75 +375,67 @@ window.addEventListener("DOMContentLoaded", async () => {
   buttons = document.querySelectorAll("#mainCard button");
   buttons.forEach(b => (b.disabled = true));
 
-  // Register the listener immediately and unconditionally at startup.
-  // Previously this was fine structurally, but the real issue was Rust emitting
-  // while the window was hidden. Now Rust shows the window before emitting,
-  // but we also add a `pendingCode` safety net: if by any chance the event
-  // arrives in the brief window before DOMContentLoaded fully resolves,
-  // we won't miss it (Tauri queues events per-window so this shouldn't happen,
-  // but belt-and-suspenders on slower machines).
-  await listen("spotify-code", async (e) => {
-    const rawCode = String(e.payload ?? "");
-    const code = (() => {
-      try {
-        return decodeURIComponent(rawCode).trim();
-      } catch {
-        return rawCode.trim();
-      }
-    })();
-    log("[EVENT] spotify-code received (hidden from logs)");
-    try { await invoke("ack_oauth_received"); } catch {}
-    await exchangeToken(code);
-  });
-
-  // Expose for Rust to call via eval()
-  window.fetchTrack     = fetchTrack;
-  window.showLoginScreen = showLoginScreen;
-  window.signOut = () => {
-    localStorage.removeItem("spotify_token");
-    localStorage.removeItem("spotify_refresh_token");
-    buttons.forEach(b => (b.disabled = true));
-    showLoginScreen();
-  };
-
-  // On startup: check for pending code first
-  const pendingCode = await invoke("read_oauth_code").catch(() => null);
-
-  if (pendingCode) {
-    log("Recovered OAuth code from file on startup");
-    await exchangeToken(pendingCode);
-  } else if (localStorage.getItem("spotify_token")) {
-    showMain();
-    fetchTrack();
-  } else {
-    // Don't auto-open the browser on startup — just show the sign-in card.
-    showLogin();
-    setAuthStatus("");
-    const url = await buildAuthUrl();
-    const btn = document.getElementById("spotifySignInBtn");
-    if (btn) btn.onclick = () => openUrl(url);
-    const copyBtn = document.getElementById("authLinkBtn");
-    const copyText = document.getElementById("authLinkText");
-    if (copyBtn && copyText) {
-      copyBtn.onclick = async () => {
+  void (async () => {
+    await listen("spotify-code", async (e) => {
+      const rawCode = String(e.payload ?? "");
+      const code = (() => {
         try {
-          await navigator.clipboard.writeText(url);
-          copyText.textContent = "Copied!";
-          setTimeout(() => { copyText.textContent = "Copy login link"; }, 2000);
-        } catch (e) { console.error("Failed to copy", e); }
-      };
-    }
-  }
+          return decodeURIComponent(rawCode).trim();
+        } catch {
+          return rawCode.trim();
+        }
+      })();
+      log("[EVENT] spotify-code received (hidden from logs)");
+      try { await invoke("ack_oauth_received"); } catch {}
+      await exchangeToken(code);
+    });
 
-  setInterval(async () => {
-    if (!navigator.onLine) return;
-    if (!localStorage.getItem("spotify_token")) return;
-    try {
-      await fetchTrack();
-    } catch (e) {
-      log("Retry fetch failed: " + e.message);
+    window.fetchTrack = fetchTrack;
+    window.showLoginScreen = showLoginScreen;
+    window.signOut = () => {
+      localStorage.removeItem("spotify_token");
+      localStorage.removeItem("spotify_refresh_token");
+      buttons.forEach(b => (b.disabled = true));
+      showLoginScreen();
+    };
+
+    const pendingCode = await invoke("read_oauth_code").catch(() => null);
+
+    if (pendingCode) {
+      log("Recovered OAuth code from file on startup");
+      await exchangeToken(pendingCode);
+    } else if (localStorage.getItem("spotify_token")) {
+      showMain();
+      void fetchTrack();
+    } else {
+      showLogin();
+      setAuthStatus("");
+      const url = await buildAuthUrl();
+      const btn = document.getElementById("spotifySignInBtn");
+      if (btn) btn.onclick = () => openUrl(url);
+      const copyBtn = document.getElementById("authLinkBtn");
+      const copyText = document.getElementById("authLinkText");
+      if (copyBtn && copyText) {
+        copyBtn.onclick = async () => {
+          try {
+            await navigator.clipboard.writeText(url);
+            copyText.textContent = "Copied!";
+            setTimeout(() => { copyText.textContent = "Copy login link"; }, 2000);
+          } catch (e) { console.error("Failed to copy", e); }
+        };
+      }
     }
-  }, 5000);
+
+    setInterval(async () => {
+      if (!navigator.onLine) return;
+      if (!localStorage.getItem("spotify_token")) return;
+      try {
+        await fetchTrack();
+      } catch (e) {
+        log("Retry fetch failed: " + e.message);
+      }
+    }, 5000);
+  })();
 });
 
 // Open lyrics

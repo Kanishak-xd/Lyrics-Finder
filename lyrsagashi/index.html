@@ -5,16 +5,18 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Lyricat</title>
+  <!-- Optional: web fonts when network allows; layout still works with system fallbacks in @theme. -->
   <link
     href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,800;1,9..144,700&family=DM+Sans:wght@400;500;600&display=swap"
     rel="stylesheet" />
   <style>
+    /* Do not set margin/padding on * here — unlayered rules override @layer utilities
+       and would zero out all Tailwind spacing (px-4, gap, grid, etc.). Preflight in
+       bundled Tailwind already resets in @layer base; utilities then apply correctly. */
     *,
     *::before,
     *::after {
       box-sizing: border-box;
-      margin: 0;
-      padding: 0;
     }
 
     html {
@@ -198,13 +200,15 @@
 
       <!-- Fallback copy link button (populated by JS) -->
       <button id="authLinkBtn"
-         class="w-full flex items-center justify-center gap-2 rounded-xl py-[8px] font-semibold text-[11.5px] transition-all duration-150 active:opacity-80"
-         style="background:rgba(0,0,0,0.04); color:rgba(30,20,10,0.6); border:1px solid rgba(0,0,0,0.06);"
-         onmouseover="this.style.background='rgba(0,0,0,0.06)'"
-         onmouseout="this.style.background='rgba(0,0,0,0.04)'">
+        class="w-full flex items-center justify-center gap-2 rounded-xl py-[8px] font-semibold text-[11.5px] transition-all duration-150 active:opacity-80"
+        style="background:rgba(0,0,0,0.04); color:rgba(30,20,10,0.6); border:1px solid rgba(0,0,0,0.06);"
+        onmouseover="this.style.background='rgba(0,0,0,0.06)'" onmouseout="this.style.background='rgba(0,0,0,0.04)'">
         <svg id="copyIcon" width="12" height="12" viewBox="0 0 24 24" fill="none" class="opacity-60">
-          <path d="M8 4V16C8 17.1046 8.89543 18 10 18H20C21.1046 18 22 17.1046 22 16V4C22 2.89543 21.1046 2 20 2H10C8.89543 2 8 2.89543 8 4Z" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
-          <path d="M16 18V20C16 21.1046 15.1046 22 14 22H4C2.89543 22 2 21.1046 2 20V8C2 6.89543 2.89543 6 4 6H6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+          <path
+            d="M8 4V16C8 17.1046 8.89543 18 10 18H20C21.1046 18 22 17.1046 22 16V4C22 2.89543 21.1046 2 20 2H10C8.89543 2 8 2.89543 8 4Z"
+            stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" />
+          <path d="M16 18V20C16 21.1046 15.1046 22 14 22H4C2.89543 22 2 21.1046 2 20V8C2 6.89543 2.89543 6 4 6H6"
+            stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" />
         </svg>
         <span id="authLinkText">Copy login link</span>
       </button>
