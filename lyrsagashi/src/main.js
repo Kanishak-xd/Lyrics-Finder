@@ -281,8 +281,13 @@ async function fetchTrack() {
       return;
     }
     if (!res.ok) { 
-      log(`Spotify API error. Code: ${res.status}`);
-      updateDisplay("Playback unavailable", `API Error ${res.status}`);
+      let errMsg = "";
+      try {
+        const errData = await res.json();
+        errMsg = errData.error?.message || "";
+      } catch {}
+      log(`Spotify API error. Code: ${res.status} ${errMsg}`);
+      updateDisplay("Playback unavailable", `API Error ${res.status}: ${errMsg || "Unknown"}`);
       buttons.forEach(b => (b.disabled = true));
       return; 
     }

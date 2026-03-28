@@ -1,6 +1,6 @@
 [package]
 name = "lyricat"
-version = "1.0.10"
+version = "1.0.11"
 description = "Lyricat – lyrics finder system tray app"
 authors = ["you"]
 edition = "2021"
